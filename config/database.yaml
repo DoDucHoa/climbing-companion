@@ -1,9 +1,14 @@
 database:
+  # Option 1: Use direct connection string (recommended for cloud databases)
+  connection_string: "mongodb+srv://doadmin:G8F70gJ2P4r165Sz@db-mongodb-fra1-59036-fe60198c.mongo.ondigitalocean.com/admin?tls=true&authSource=admin&replicaSet=db-mongodb-fra1-59036"
+  
+  # Option 2: Use individual connection parameters (for localhost)
   connection:
     host: "localhost"
     port: 27017
     username: ""  # Leave empty if no authentication is required
     password: ""  # Leave empty if no authentication is required
+  
   settings:
-    name: "digital_twin_db"  # Your database name
+    name: "climbing-companion"  # Your database name
     auth_source: "admin"
