@@ -1,0 +1,69 @@
+schemas:
+  # Common fields that apply to all Digital Replicas
+  common_fields:
+    profile:
+      name: str
+      phone: str
+      email: str
+      telegram_chat_id: str
+    
+    metadata:
+      created_at: datetime
+      updated_at: datetime
+  
+  # Entity-specific fields for EMERGENCY_CONTACT
+  entity:
+    data:
+      user_id: str
+      relationship_type: str
+      priority: int
+      is_active: bool
+      notes: str
+  
+  # Validation rules
+  validations:
+    # Mandatory fields that must be present
+    mandatory_fields:
+      profile:
+        - name
+        - phone
+      data:
+        - user_id
+      metadata:
+        - created_at
+        - updated_at
+    
+    # Type constraints and validation rules
+    type_constraints:
+      name:
+        min_length: 2
+        max_length: 100
+      
+      phone:
+        pattern: "^\\+?[0-9]{10,15}$"  # Phone format validation
+      
+      email:
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"  # Email format validation
+      
+      telegram_chat_id:
+        pattern: "^[0-9]+$"  # Telegram chat ID must be numeric
+      
+      relationship_type:
+        enum: ["family", "friend", "colleague", "spouse", "parent", "sibling", "child", "other"]
+        default: "other"
+      
+      priority:
+        min: 1
+        max: 10
+        default: 1
+      
+      is_active:
+        default: true
+    
+    # Initialization defaults
+    initialization:
+      data:
+        priority: 1
+        is_active: true
+        relationship_type: "other"
+        notes: ""

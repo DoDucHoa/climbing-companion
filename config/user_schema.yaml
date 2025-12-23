@@ -1,0 +1,49 @@
+schemas:
+  common_fields:
+    profile:
+      name: str
+      email: str
+      phone: str
+      date_of_birth: datetime
+    
+    metadata:
+      created_at: datetime
+      updated_at: datetime
+  
+  # Entity-specific fields for USER
+  entity:
+    data:
+      user_preferences: Dict
+      profile_picture_url: str
+      is_active: bool
+      notification_settings: Dict
+  
+  # Validation rules
+  validations:
+    # Mandatory fields that must be present
+    mandatory_fields:
+      profile:
+        - name
+        - email
+      metadata:
+        - created_at
+        - updated_at
+    
+    # Type constraints and validation rules
+    type_constraints:
+      email:
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"  # Email format validation
+        unique: true  # Email must be unique
+      
+      phone:
+        pattern: "^\\+?[0-9]{10,15}$"  # Phone format validation
+      
+      is_active:
+        default: true
+      
+    # Initialization defaults
+    initialization:
+      data:
+        is_active: true
+        user_preferences: {}
+        notification_settings: {}
