@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Dict, Any, Type, Optional, List, Union
-from pydantic import BaseModel, create_model, Field, field_validator
+from pydantic import BaseModel, create_model, Field, field_validator, model_validator
 import yaml
 import uuid
+import re
 
 
 class DRFactory:
@@ -54,30 +55,44 @@ class DRFactory:
                         else (
                             float
                             if field_type == "float"
-                            else datetime if field_type == "datetime" else Any
+                            else datetime
+                            if field_type == "datetime"
+                            else Any
                         )
                     )
                 ),
                 Field(None if not is_required else ..., **constraints),
             )
 
-        model = create_model("Profile", **field_definitions)
+        # Create base model class with validators
+        class ProfileModel(BaseModel):
+            @model_validator(mode="after")
+            def validate_constraints(self):
+                # Validate patterns and enums
+                for field_name, constraint_rules in type_constraints.items():
+                    if hasattr(self, field_name):
+                        value = getattr(self, field_name)
+                        if value is not None:
+                            # Pattern validation
+                            if "pattern" in constraint_rules:
+                                pattern = constraint_rules["pattern"]
+                                if not re.match(pattern, str(value)):
+                                    raise ValueError(
+                                        f"{field_name} does not match required pattern: {pattern}"
+                                    )
 
-        # Add enum validators where needed
-        for field_name in field_definitions:
-            if (
-                field_name in type_constraints
-                and "enum" in type_constraints[field_name]
-            ):
-                enum_values = type_constraints[field_name]["enum"]
+                            # Enum validation
+                            if "enum" in constraint_rules:
+                                enum_values = constraint_rules["enum"]
+                                if value not in enum_values:
+                                    raise ValueError(
+                                        f"{field_name} must be one of {enum_values}"
+                                    )
 
-                @field_validator(field_name)
-                def validate_enum(value, field):
-                    if value not in enum_values:
-                        raise ValueError(f"{field.name} must be one of {enum_values}")
-                    return value
+                return self
 
-                setattr(model, f"validate_{field_name}", validate_enum)
+        # Create final model
+        model = create_model("Profile", __base__=ProfileModel, **field_definitions)
 
         return model
 
@@ -90,6 +105,16 @@ class DRFactory:
 
         field_definitions = {}
         for field_name, field_type in data_fields.items():
+            constraints = {}
+
+            # Add min/max constraints for numeric fields
+            if field_name in type_constraints:
+                rules = type_constraints[field_name]
+                if "min" in rules:
+                    constraints["ge"] = rules["min"]
+                if "max" in rules:
+                    constraints["le"] = rules["max"]
+
             if field_type == "List[Dict]":
                 field_definitions[field_name] = (
                     List[Dict[str, Any]],
@@ -105,31 +130,45 @@ class DRFactory:
                         else (
                             int
                             if field_type == "int"
-                            else float if field_type == "float" else Any
+                            else float
+                            if field_type == "float"
+                            else Any
                         )
                     ),
-                    Field(None),
+                    Field(None, **constraints),
                 )
 
-        model = create_model("Data", **field_definitions)
+        # Create base model with model-level validator
+        class DataModel(BaseModel):
+            @model_validator(mode="after")
+            def validate_constraints(self):
+                # Validate patterns and enums
+                for field_name, constraint_rules in type_constraints.items():
+                    if hasattr(self, field_name):
+                        value = getattr(self, field_name)
+                        if value is not None:
+                            # Pattern validation
+                            if "pattern" in constraint_rules:
+                                pattern = constraint_rules["pattern"]
+                                if not re.match(pattern, str(value)):
+                                    raise ValueError(
+                                        f"{field_name} does not match required pattern: {pattern}"
+                                    )
 
-        # Add validators for fields that need them
+                            # Enum validation
+                            if "enum" in constraint_rules:
+                                enum_values = constraint_rules["enum"]
+                                if value not in enum_values:
+                                    raise ValueError(
+                                        f"{field_name} must be one of {enum_values}"
+                                    )
+
+                return self
+
+        model = create_model("Data", __base__=DataModel, **field_definitions)
+
+        # Add validators for List[Dict] fields only
         for field_name, field_type in data_fields.items():
-            # Add enum validator if needed
-            if (
-                field_name in type_constraints
-                and "enum" in type_constraints[field_name]
-            ):
-                enum_values = type_constraints[field_name]["enum"]
-
-                @field_validator(field_name)
-                def validate_enum(value, field):
-                    if value not in enum_values:
-                        raise ValueError(f"{field.name} must be one of {enum_values}")
-                    return value
-
-                setattr(model, f"validate_{field_name}", validate_enum)
-
             # Add List[Dict] validator if needed
             if field_type == "List[Dict]" and field_name in type_constraints:
                 rules = type_constraints[field_name]

@@ -75,14 +75,26 @@ class DatabaseService:
         try:
             collection_name = self.schema_registry.get_collection_name(dr_type)
 
+            # Flatten nested updates to use MongoDB dot notation
+            # This prevents overwriting entire nested objects
+            flattened_updates = {}
+
+            def flatten_dict(data: Dict, prefix: str = ""):
+                for key, value in data.items():
+                    full_key = f"{prefix}.{key}" if prefix else key
+                    if isinstance(value, dict) and key not in ["metadata"]:
+                        flatten_dict(value, full_key)
+                    else:
+                        flattened_updates[full_key] = value
+
+            flatten_dict(update_data)
+
             # Always update metadata.updated_at
-            if "metadata" not in update_data:
-                update_data["metadata"] = {}
-            update_data["metadata"]["updated_at"] = datetime.utcnow()
+            flattened_updates["metadata.updated_at"] = datetime.utcnow()
 
             # Let SchemaRegistry handle validation through MongoDB schema
             result = self.db[collection_name].update_one(
-                {"_id": dr_id}, {"$set": update_data}
+                {"_id": dr_id}, {"$set": flattened_updates}
             )
 
             if result.matched_count == 0:
