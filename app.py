@@ -4,12 +4,15 @@ from src.virtualization.digital_replica.schema_registry import SchemaRegistry
 from src.services.database_service import DatabaseService
 from src.digital_twin.dt_factory import DTFactory
 from src.application.api import register_api_blueprints
+from src.application.auth_routes import auth_bp
 from config.config_loader import ConfigLoader
+import os
 
 
 class FlaskServer:
     def __init__(self):
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, template_folder="templates", static_folder="static")
+        self.app.secret_key = os.urandom(24)
         CORS(self.app)
         self._init_components()
         self._register_blueprints()
@@ -40,6 +43,9 @@ class FlaskServer:
     def _register_blueprints(self):
         """Register all API blueprints"""
         register_api_blueprints(self.app)
+        self.app.register_blueprint(
+            auth_bp
+        )
 
     def run(self, host="0.0.0.0", port=5000, debug=True):
         """Run the Flask server"""
