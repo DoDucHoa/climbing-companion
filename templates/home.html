@@ -14,43 +14,24 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f5f5f5;
             min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
         }
-        .container {
-            background: white;
-            padding: 60px;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 500px;
-        }
-        h1 {
+        .header h1 {
             color: #1976d2;
-            font-size: 48px;
-            margin-bottom: 20px;
+            font-size: 24px;
             font-weight: 500;
         }
-        .welcome {
-            color: #424242;
-            font-size: 18px;
-            margin-bottom: 30px;
-        }
-        .user-info {
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 4px;
-            margin-bottom: 30px;
-        }
-        .user-info p {
-            color: #424242;
-            margin: 8px 0;
-            font-size: 14px;
-        }
         .logout-btn {
-            display: inline-block;
-            padding: 12px 30px;
+            padding: 8px 20px;
             background: #1976d2;
             color: white;
             text-decoration: none;
@@ -62,19 +43,252 @@
         .logout-btn:hover {
             background: #1565c0;
         }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .tabs {
+            display: flex;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            color: #424242;
+            font-size: 14px;
+        }
+        .tab:hover {
+            background: #f5f5f5;
+        }
+        .tab.active {
+            color: #1976d2;
+            border-bottom-color: #1976d2;
+            font-weight: 500;
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .section-title {
+            color: #1976d2;
+            font-size: 20px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #424242;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+        button {
+            padding: 12px 30px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .info-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .info-card p {
+            color: #424242;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Hello World!</h1>
-        <p class="welcome">Welcome to Digital Twin System</p>
-        
-        <div class="user-info">
-            <p><strong>Name:</strong> {{ user.name }}</p>
-            <p><strong>Email:</strong> {{ user.email }}</p>
-        </div>
-        
+    <div class="header">
+        <h1>Climbing Companion</h1>
         <a href="/logout" class="logout-btn">Logout</a>
     </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('profile')">Profile</div>
+            <div class="tab" onclick="showTab('devices')">Devices</div>
+            <div class="tab" onclick="showTab('emergency')">Emergency Contacts</div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profile" class="tab-content active">
+            <h2 class="section-title">Profile Information</h2>
+            
+            {% if success %}
+            <div class="message success">{{ success }}</div>
+            {% endif %}
+            
+            {% if error %}
+            <div class="message error">{{ error }}</div>
+            {% endif %}
+            
+            <div class="info-card">
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Member since:</strong> {{ user.created_at or 'N/A' }}</p>
+            </div>
+
+            <form method="POST" action="/update-profile">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" value="{{ user.name }}" required placeholder="Enter your full name">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}" placeholder="Enter your phone number">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dob">Date of Birth</label>
+                        <input type="date" id="dob" name="dob" value="{{ user.dob or '' }}">
+                    </div>
+                </div>
+                
+                <button type="submit">Update Profile</button>
+            </form>
+        </div>
+
+        <!-- Devices Tab -->
+        <div id="devices" class="tab-content">
+            <h2 class="section-title">Register New Device</h2>
+            
+            <form method="POST" action="/register-device">
+                <div class="form-group">
+                    <label for="serial_number">Device Serial Number</label>
+                    <input type="text" id="serial_number" name="serial_number" required placeholder="Enter device serial number">
+                </div>
+                
+                <button type="submit">Register Device</button>
+            </form>
+
+            <div style="margin-top: 30px;">
+                <h3 style="color: #424242; font-size: 16px; margin-bottom: 15px;">Registered Devices</h3>
+                <div class="info-card">
+                    <p style="color: #757575;">No devices registered yet</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emergency Contacts Tab -->
+        <div id="emergency" class="tab-content">
+            <h2 class="section-title">Add Emergency Contact</h2>
+            
+            <form method="POST" action="/add-emergency-contact">
+                <div class="form-group">
+                    <label for="contact_name">Contact Name</label>
+                    <input type="text" id="contact_name" name="contact_name" required placeholder="Enter contact name">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact_phone">Phone Number</label>
+                        <input type="tel" id="contact_phone" name="contact_phone" required placeholder="Enter phone number">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contact_email">Email</label>
+                        <input type="email" id="contact_email" name="contact_email" placeholder="Enter email (optional)">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="telegram_id">Telegram Chat ID</label>
+                    <input type="text" id="telegram_id" name="telegram_id" placeholder="Enter Telegram chat ID">
+                </div>
+                
+                <button type="submit">Add Emergency Contact</button>
+            </form>
+
+            <div style="margin-top: 30px;">
+                <h3 style="color: #424242; font-size: 16px; margin-bottom: 15px;">Emergency Contacts</h3>
+                <div class="info-card">
+                    <p style="color: #757575;">No emergency contacts added yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab');
+            const contents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Show selected tab
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+    </script>
 </body>
 </html>
