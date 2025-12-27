@@ -1,0 +1,45 @@
+schemas:
+  common_fields:
+    profile:
+      paired_at: datetime
+      
+    metadata:
+      created_at: datetime
+      updated_at: datetime
+
+  entity:
+    data:
+      user_id: str
+      device_id: str
+      unpaired_at: datetime
+      pairing_status: str
+      pairing_method: str
+
+  validations:
+    mandatory_fields:
+      profile:
+        - paired_at
+      data:
+        - user_id
+        - device_id
+
+    type_constraints:
+      pairing_status:
+        enum:
+          - "active"
+          - "unpaired"
+          - "suspended"
+          - "expired"
+          
+      pairing_method:
+        enum:
+          - "wifi"
+          - "bluetooth"
+          - "qr_code"
+          - "nfc"
+          - "manual"
+
+    initialization:
+      pairing_status: "active"
+      pairing_method: "wifi"
+  

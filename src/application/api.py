@@ -8,7 +8,6 @@ from src.application.routes import (
 
 
 def register_api_blueprints(app):
-    """Register all API blueprints with the Flask app"""
     app.register_blueprint(dt_api)
     app.register_blueprint(dr_api)
     app.register_blueprint(dt_management_api)

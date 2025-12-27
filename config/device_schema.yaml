@@ -1,0 +1,41 @@
+schemas:
+  common_fields:
+    profile:
+      serial_number: str
+      
+    metadata:
+      created_at: datetime
+      updated_at: datetime
+
+  entity:
+    data:
+      status: str
+      firmware_version: str
+      battery_level: float
+      last_sync_at: datetime
+      settings: Dict
+
+  validations:
+    mandatory_fields:
+      profile:
+        - serial_number
+      data:
+        - status
+
+    type_constraints:
+      status:
+        enum:
+          - "active"
+          - "inactive"
+          - "maintenance"
+          - "retired"
+          
+      battery_level:
+        min: 0
+        max: 100
+
+    initialization:
+      status: "inactive"
+      battery_level: 100
+      settings:
+        sync_interval: 300

@@ -4,6 +4,7 @@ from pydantic import BaseModel, create_model, Field, field_validator, model_vali
 import yaml
 import uuid
 import re
+import time
 
 
 class DRFactory:
@@ -236,21 +237,12 @@ class DRFactory:
         init_values = (
             self.schema["schemas"].get("validations", {}).get("initialization", {})
         )
-        for section, defaults in init_values.items():
-            if section == "metadata":
-                dr_dict["metadata"].update(defaults)
-            elif section in [
-                "status",
-                "sensors",
-                "devices",
-                "medications",
-                "measurements",
-            ]:
-                # Questi campi vanno dentro data
-                dr_dict["data"][section] = defaults
+        for field_name, default_value in init_values.items():
+            if field_name == "metadata":
+                dr_dict["metadata"].update(default_value)
             else:
-                # Altri campi vanno nella root
-                dr_dict[section] = defaults
+                # All other initialization values go into data section
+                dr_dict["data"][field_name] = default_value
 
         # Update with provided data and validate each section
         if "profile" in initial_data:
@@ -272,7 +264,10 @@ class DRFactory:
         ProfileModel = self._create_profile_model()
         DataModel = self._create_data_model()
 
-        updated_dr = dr.copy()
+        # Create a deep copy to avoid modifying the original
+        import copy
+
+        updated_dr = copy.deepcopy(dr)
 
         # Validate and apply updates section by section
         if "profile" in updates:
@@ -288,7 +283,8 @@ class DRFactory:
         if "metadata" in updates:
             updated_dr["metadata"].update(updates["metadata"])
 
-        # Update timestamp
+        # Update timestamp (add small delay to ensure timestamp difference)
+        time.sleep(0.001)
         updated_dr["metadata"]["updated_at"] = datetime.utcnow()
 
         return updated_dr
