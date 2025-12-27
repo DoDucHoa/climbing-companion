@@ -111,6 +111,40 @@ def home():
     except Exception as e:
         print(f"Error fetching emergency contacts: {e}")
 
+    # Get user's devices
+    devices = []
+    try:
+        # Get all pairings for user
+        pairing_collection = db_service.db["device_pairing_collection"]
+        pairings = list(
+            pairing_collection.find(
+                {
+                    "data.user_id": session.get("user_id"),
+                    "data.pairing_status": "active",
+                }
+            )
+        )
+
+        # Get device details
+        device_collection = db_service.db["device_collection"]
+        for pairing in pairings:
+            device_id = pairing["data"]["device_id"]
+            device = device_collection.find_one({"_id": device_id})
+
+            if device:
+                devices.append(
+                    {
+                        "_id": device["_id"],
+                        "serial_number": device["profile"]["serial_number"],
+                        "status": device["data"].get("status", "inactive"),
+                        "battery_level": device["data"].get("battery_level", 0),
+                        "last_sync_at": device["data"].get("last_sync_at"),
+                        "paired_at": pairing["profile"].get("paired_at"),
+                    }
+                )
+    except Exception as e:
+        print(f"Error fetching devices: {e}")
+
     # Get success/error messages from query params
     success_message = request.args.get("success")
     error_message = request.args.get("error")
@@ -119,6 +153,7 @@ def home():
         "home.html",
         user=user,
         emergency_contacts=emergency_contacts,
+        devices=devices,
         success=success_message,
         error=error_message,
     )

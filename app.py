@@ -1,12 +1,20 @@
 from flask import Flask
 from flask_cors import CORS
 from src.virtualization.digital_replica.schema_registry import SchemaRegistry
+from src.virtualization.digital_replica.dr_factory import DRFactory
 from src.services.database_service import DatabaseService
 from src.digital_twin.dt_factory import DTFactory
+from src.services.mqtt_service import MQTTService
 from src.application.api import register_api_blueprints
 from src.application.auth_routes import auth_bp
 from config.config_loader import ConfigLoader
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 
 class FlaskServer:
@@ -16,6 +24,7 @@ class FlaskServer:
         CORS(self.app)
         self._init_components()
         self._register_blueprints()
+        self._init_mqtt()
 
     def _init_components(self):
         """Initialize all required components and store them in app config"""
@@ -26,6 +35,10 @@ class FlaskServer:
             "emergency_contact", "config/emergency_contact_schema.yaml"
         )
         schema_registry.load_schema("user", "config/user_schema.yaml")
+        schema_registry.load_schema("device", "config/device_schema.yaml")
+        schema_registry.load_schema(
+            "device_pairing", "config/device_pairing_schema.yaml"
+        )
 
         # Load database configuration
         db_config = ConfigLoader.load_database_config()
@@ -42,10 +55,33 @@ class FlaskServer:
         # Initialize DTFactory
         dt_factory = DTFactory(db_service, schema_registry)
 
+        # Initialize DRFactory instances for each schema type
+        device_dr_factory = DRFactory("config/device_schema.yaml")
+        device_pairing_dr_factory = DRFactory("config/device_pairing_schema.yaml")
+        emergency_contact_dr_factory = DRFactory("config/emergency_contact_schema.yaml")
+
         # Store references
         self.app.config["SCHEMA_REGISTRY"] = schema_registry
         self.app.config["DB_SERVICE"] = db_service
         self.app.config["DT_FACTORY"] = dt_factory
+        self.app.config["DEVICE_DR_FACTORY"] = device_dr_factory
+        self.app.config["DEVICE_PAIRING_DR_FACTORY"] = device_pairing_dr_factory
+        self.app.config["EMERGENCY_CONTACT_DR_FACTORY"] = emergency_contact_dr_factory
+
+    def _init_mqtt(self):
+        """Initialize MQTT service for device communication"""
+        try:
+            db_service = self.app.config["DB_SERVICE"]
+            dt_factory = self.app.config["DT_FACTORY"]
+
+            mqtt_service = MQTTService(db_service, dt_factory)
+            mqtt_service.connect()
+
+            self.app.config["MQTT_SERVICE"] = mqtt_service
+            self.app.logger.info("MQTT Service initialized successfully")
+        except Exception as e:
+            self.app.logger.error(f"Failed to initialize MQTT service: {str(e)}")
+            # Continue without MQTT - application can still work for other features
 
     def _register_blueprints(self):
         """Register all API blueprints"""
@@ -58,6 +94,8 @@ class FlaskServer:
             self.app.run(host=host, port=port, debug=debug)
         finally:
             # Cleanup on server shutdown
+            if "MQTT_SERVICE" in self.app.config:
+                self.app.config["MQTT_SERVICE"].disconnect()
             if "DB_SERVICE" in self.app.config:
                 self.app.config["DB_SERVICE"].disconnect()
 

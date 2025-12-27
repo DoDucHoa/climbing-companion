@@ -4,6 +4,7 @@ from src.application.routes import (
     dr_api,
     dt_management_api,
     emergency_contact_api,
+    device_api,
 )
 
 
@@ -12,3 +13,4 @@ def register_api_blueprints(app):
     app.register_blueprint(dr_api)
     app.register_blueprint(dt_management_api)
     app.register_blueprint(emergency_contact_api)
+    app.register_blueprint(device_api)
