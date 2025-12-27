@@ -1,0 +1,19 @@
+schemas:
+  common_fields:
+    profile:
+      create_at: datetime
+      
+    metadata:
+      created_at: datetime
+
+  entity:
+    data:
+      session_id: str
+      alt: float
+
+  validations:
+    mandatory_fields:
+      profile:
+        - create_at
+      data:
+        - session_id

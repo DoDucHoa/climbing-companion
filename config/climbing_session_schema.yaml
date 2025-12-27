@@ -1,0 +1,48 @@
+schemas:
+  common_fields:
+    profile:
+      start_at: datetime
+      session_state: str
+      
+    metadata:
+      created_at: datetime
+      updated_at: datetime
+
+  entity:
+    data:
+      user_id: str
+      device_id: str
+      temp: float
+      humidity: float
+      start_alt: float
+      end_alt: float
+      latitude: float
+      longitude: float
+      end_at: datetime
+
+  validations:
+    mandatory_fields:
+      profile:
+        - start_at
+        - session_state
+      data:
+        - user_id
+
+    type_constraints:
+      session_state:
+        enum:
+          - "START"
+          - "ACTIVE"
+          - "END"
+          - "INCIDENT"
+
+      latitude:
+        min: -90
+        max: 90
+        
+      longitude:
+        min: -180
+        max: 180
+
+    initialization:
+      session_state: "ACTIVE"
