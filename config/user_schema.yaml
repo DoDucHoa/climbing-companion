@@ -43,7 +43,6 @@ schemas:
       
     # Initialization defaults
     initialization:
-      data:
-        is_active: true
-        user_preferences: {}
-        notification_settings: {}
+      is_active: true
+      user_preferences: {}
+      notification_settings: {}
