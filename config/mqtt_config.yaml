@@ -1,0 +1,19 @@
+mqtt:
+  broker:
+    host: "broker.hivemq.com"
+    port: 1883
+    websocket_port: 8000
+    keepalive: 60
+    
+  topics:
+    status: "climbing/+/status"
+    
+  qos:
+    subscribe: 1
+    publish: 1
+    
+  client:
+    id_prefix: "climbing_companion_"
+    clean_session: true
+    reconnect_delay: 5
+    max_reconnect_attempts: 10
