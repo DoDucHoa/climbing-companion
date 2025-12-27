@@ -20,6 +20,13 @@ class FlaskServer:
     def _init_components(self):
         """Initialize all required components and store them in app config"""
         schema_registry = SchemaRegistry()
+
+        # Load schemas
+        schema_registry.load_schema(
+            "emergency_contact", "config/emergency_contact_schema.yaml"
+        )
+        schema_registry.load_schema("user", "config/user_schema.yaml")
+
         # Load database configuration
         db_config = ConfigLoader.load_database_config()
         connection_string = ConfigLoader.build_connection_string(db_config)
@@ -43,9 +50,7 @@ class FlaskServer:
     def _register_blueprints(self):
         """Register all API blueprints"""
         register_api_blueprints(self.app)
-        self.app.register_blueprint(
-            auth_bp
-        )
+        self.app.register_blueprint(auth_bp)
 
     def run(self, host="0.0.0.0", port=5000, debug=True):
         """Run the Flask server"""

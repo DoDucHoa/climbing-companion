@@ -101,9 +101,32 @@
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="telegram_id">Telegram Chat ID</label>
-                    <input type="text" id="telegram_id" name="telegram_id" placeholder="Enter Telegram chat ID">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telegram_id">Telegram Chat ID</label>
+                        <input type="text" required id="telegram_id" name="telegram_id" placeholder="Enter Telegram chat ID">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="relationship_type">Relationship</label>
+                        <select id="relationship_type" name="relationship_type">
+                            <option value="family">Family</option>
+                            <option value="friend">Friend</option>
+                            <option value="spouse">Spouse</option>
+                            <option value="parent">Parent</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="child">Child</option>
+                            <option value="colleague">Colleague</option>
+                            <option value="other" selected>Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <input type="text" id="notes" name="notes" placeholder="Additional notes (optional)">
+                    </div>
                 </div>
                 
                 <button type="submit">Add Emergency Contact</button>
@@ -111,9 +134,48 @@
 
             <div style="margin-top: 30px;">
                 <h3 style="color: #424242; font-size: 16px; margin-bottom: 15px;">Emergency Contacts</h3>
-                <div class="info-card">
-                    <p style="color: #757575;">No emergency contacts added yet</p>
-                </div>
+                
+                {% if emergency_contacts and emergency_contacts|length > 0 %}
+                    {% for contact in emergency_contacts %}
+                    <div class="info-card" style="margin-bottom: 15px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <p><strong>{{ contact.profile.name }}</strong></p>
+                                <p><strong>Phone:</strong> {{ contact.profile.phone }}</p>
+                                {% if contact.profile.email %}
+                                <p><strong>Email:</strong> {{ contact.profile.email }}</p>
+                                {% endif %}
+                                {% if contact.profile.telegram_chat_id %}
+                                <p><strong>Telegram:</strong> {{ contact.profile.telegram_chat_id }}</p>
+                                {% endif %}
+                                <p><strong>Relationship:</strong> {{ contact.data.relationship_type }}</p>
+                                <p><strong>Priority:</strong> {{ contact.data.priority }}</p>
+                                {% if contact.data.notes %}
+                                <p><strong>Notes:</strong> {{ contact.data.notes }}</p>
+                                {% endif %}
+                                <p style="color: #999; font-size: 12px;">Added: {{ contact.metadata.created_at.strftime('%Y-%m-%d') if contact.metadata.created_at else 'N/A' }}</p>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button onclick="editContact('{{ contact._id }}')" 
+                                        style="padding: 5px 15px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    Edit
+                                </button>
+                                <form method="POST" action="/delete-emergency-contact/{{ contact._id }}" style="display: inline;">
+                                    <button type="submit" 
+                                            onclick="return confirm('Are you sure you want to delete this contact?')"
+                                            style="padding: 5px 15px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="info-card">
+                        <p style="color: #757575;">No emergency contacts added yet</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -130,6 +192,12 @@
             // Show selected tab
             event.target.classList.add('active');
             document.getElementById(tabName).classList.add('active');
+        }
+        
+        function editContact(contactId) {
+            // For now, just show an alert. You can implement a modal or inline editing later
+            alert('Edit functionality for contact ' + contactId + ' - Coming soon!');
+            // TODO: Implement edit modal or inline form
         }
     </script>
 </body>
