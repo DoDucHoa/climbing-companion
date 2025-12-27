@@ -16,9 +16,7 @@ schemas:
     data:
       user_id: str
       relationship_type: str
-      priority: int
       is_active: bool
-      notes: str
   
   # Validation rules
   validations:
@@ -52,18 +50,10 @@ schemas:
         enum: ["family", "friend", "colleague", "spouse", "parent", "sibling", "child", "other"]
         default: "other"
       
-      priority:
-        min: 1
-        max: 10
-        default: 1
-      
       is_active:
         default: true
     
     # Initialization defaults
     initialization:
-      data:
-        priority: 1
-        is_active: true
-        relationship_type: "other"
-        notes: ""
+      is_active: true
+      relationship_type: "other"
