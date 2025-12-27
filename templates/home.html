@@ -121,13 +121,6 @@
                         </select>
                     </div>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="notes">Notes</label>
-                        <input type="text" id="notes" name="notes" placeholder="Additional notes (optional)">
-                    </div>
-                </div>
                 
                 <button type="submit">Add Emergency Contact</button>
             </form>
@@ -149,10 +142,6 @@
                                 <p><strong>Telegram:</strong> {{ contact.profile.telegram_chat_id }}</p>
                                 {% endif %}
                                 <p><strong>Relationship:</strong> {{ contact.data.relationship_type }}</p>
-                                <p><strong>Priority:</strong> {{ contact.data.priority }}</p>
-                                {% if contact.data.notes %}
-                                <p><strong>Notes:</strong> {{ contact.data.notes }}</p>
-                                {% endif %}
                                 <p style="color: #999; font-size: 12px;">Added: {{ contact.metadata.created_at.strftime('%Y-%m-%d') if contact.metadata.created_at else 'N/A' }}</p>
                             </div>
                             <div style="display: flex; gap: 10px;">
