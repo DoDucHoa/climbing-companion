@@ -10,8 +10,9 @@ schemas:
 
   entity:
     data:
+      session_id: str
       user_id: str
-      device_id: str
+      device_serial: str
       temp: float
       humidity: float
       start_alt: float
@@ -26,7 +27,9 @@ schemas:
         - start_at
         - session_state
       data:
+        - session_id
         - user_id
+        - device_serial
 
     type_constraints:
       session_state:

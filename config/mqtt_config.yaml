@@ -7,6 +7,7 @@ mqtt:
     
   topics:
     status: "climbing/+/status"
+    telemetry: "climbing/+"
     
   qos:
     subscribe: 1

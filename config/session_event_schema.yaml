@@ -9,6 +9,7 @@ schemas:
   entity:
     data:
       session_id: str
+      device_serial: str
       alt: float
 
   validations:
@@ -17,3 +18,5 @@ schemas:
         - create_at
       data:
         - session_id
+        - device_serial
+        - alt
