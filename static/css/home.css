@@ -172,6 +172,15 @@ button:hover {
     gap: 20px;
 }
 
+.session-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.session-card.selected {
+    border-left: 4px solid #1976d2;
+    background: #f9f9f9;
+}
+
 @media (max-width: 768px) {
     .form-row {
         grid-template-columns: 1fr;

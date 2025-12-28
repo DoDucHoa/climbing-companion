@@ -6,6 +6,7 @@ from flask import (
     url_for,
     session,
     current_app,
+    jsonify,
 )
 from datetime import datetime
 
@@ -154,6 +155,18 @@ def home():
     except Exception as e:
         print(f"Error fetching devices: {e}")
 
+    # Get user's climbing sessions
+    sessions = []
+    try:
+        session_collection = db_service.db["climbing_session_collection"]
+        sessions = list(
+            session_collection.find({"data.user_id": session.get("user_id")}).sort(
+                "profile.start_at", -1
+            )  # Most recent first
+        )
+    except Exception as e:
+        print(f"Error fetching sessions: {e}")
+
     # Get success/error messages from query params
     success_message = request.args.get("success")
     error_message = request.args.get("error")
@@ -163,6 +176,7 @@ def home():
         user=user,
         emergency_contacts=emergency_contacts,
         devices=devices,
+        sessions=sessions,
         success=success_message,
         error=error_message,
     )
@@ -371,3 +385,66 @@ def delete_emergency_contact(contact_id):
         return redirect(
             url_for("auth.home", error=f"Failed to delete emergency contact: {str(e)}")
         )
+
+
+@auth_bp.route("/api/session-events/<session_id>")
+def get_session_events(session_id):
+    """API endpoint to get session events for visualization"""
+    # Check if user is logged in
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db_service = current_app.config["DB_SERVICE"]
+
+        # Verify session belongs to user
+        session_collection = db_service.db["climbing_session_collection"]
+        climbing_session = session_collection.find_one(
+            {"data.session_id": session_id, "data.user_id": session.get("user_id")}
+        )
+
+        if not climbing_session:
+            return jsonify({"error": "Session not found"}), 404
+
+        # Get all events for this session
+        event_collection = db_service.db["session_event_collection"]
+        events = list(
+            event_collection.find({"data.session_id": session_id}).sort(
+                "profile.create_at", 1
+            )  # Sort by time ascending
+        )
+
+        # Format data for chart
+        chart_data = {
+            "labels": [],
+            "altitudes": [],
+            "session_info": {
+                "session_id": session_id,
+                "start_at": climbing_session["profile"]["start_at"].isoformat()
+                if climbing_session["profile"]["start_at"]
+                else None,
+                "session_state": climbing_session["profile"]["session_state"],
+                "start_alt": climbing_session["data"].get("start_alt"),
+                "end_alt": climbing_session["data"].get("end_alt"),
+                "temp": climbing_session["data"].get("temp"),
+                "humidity": climbing_session["data"].get("humidity"),
+            },
+        }
+
+        for event in events:
+            create_at = event["profile"]["create_at"]
+            alt = event["data"]["alt"]
+
+            # Format time label
+            if isinstance(create_at, datetime):
+                time_label = create_at.strftime("%H:%M:%S")
+            else:
+                time_label = str(create_at)
+
+            chart_data["labels"].append(time_label)
+            chart_data["altitudes"].append(alt)
+
+        return jsonify(chart_data)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -17,6 +18,7 @@
             <div class="tab active" onclick="showTab('profile')">Profile</div>
             <div class="tab" onclick="showTab('devices')">Devices</div>
             <div class="tab" onclick="showTab('emergency')">Emergency Contacts</div>
+            <div class="tab" onclick="showTab('sessions')">Climbing Sessions</div>
         </div>
 
         <!-- Profile Tab -->
@@ -105,6 +107,93 @@
                     </div>
                 {% endif %}
             </div>
+        </div>
+
+        <!-- Sessions Tab -->
+        <div id="sessions" class="tab-content">
+            <h2 class="section-title">Climbing Sessions</h2>
+            
+            {% if sessions and sessions|length > 0 %}
+                <!-- Session List -->
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #424242; font-size: 16px; margin-bottom: 15px;">Your Sessions</h3>
+                    
+                    {% for ses in sessions %}
+                    <div class="info-card session-card" data-session-id="{{ ses.data.session_id }}" 
+                         style="margin-bottom: 15px; cursor: pointer; transition: box-shadow 0.3s;"
+                         onclick="loadSessionData('{{ ses.data.session_id }}')">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    {% if ses.profile.session_state == 'END' %}
+                                    <span style="background-color: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Completed</span>
+                                    {% elif ses.profile.session_state == 'ACTIVE' %}
+                                    <span style="background-color: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Active</span>
+                                    {% elif ses.profile.session_state == 'START' %}
+                                    <span style="background-color: #FF9800; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Started</span>
+                                    {% elif ses.profile.session_state == 'INCIDENT' %}
+                                    <span style="background-color: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Incident</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <p><strong>Start:</strong> {{ ses.profile.start_at.strftime('%Y-%m-%d %H:%M:%S') if ses.profile.start_at else 'N/A' }}</p>
+                                
+                                {% if ses.data.end_at %}
+                                <p><strong>End:</strong> {{ ses.data.end_at.strftime('%Y-%m-%d %H:%M:%S') if ses.data.end_at is not string else ses.data.end_at }}</p>
+                                {% endif %}
+                                
+                                {% if ses.data.start_alt %}
+                                <p><strong>Start Altitude:</strong> {{ "%.1f"|format(ses.data.start_alt) }}m</p>
+                                {% endif %}
+                                
+                                {% if ses.data.end_alt %}
+                                <p><strong>End Altitude:</strong> {{ "%.1f"|format(ses.data.end_alt) }}m</p>
+                                {% endif %}
+                                
+                                <p style="color: #999; font-size: 12px; margin-top: 5px;">Click to view details</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Session Detail View -->
+                <div id="sessionDetail" style="display: none; margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: #424242; font-size: 16px; margin: 0;">Session Details</h3>
+                        <button onclick="closeSessionDetail()" 
+                                style="padding: 5px 15px; background-color: #757575; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Close
+                        </button>
+                    </div>
+                    
+                    <!-- Session Summary -->
+                    <div class="info-card" style="margin-bottom: 20px;">
+                        <h4 style="margin-top: 0; color: #424242;">Session Summary</h4>
+                        <div id="sessionSummary">
+                            <p><strong>Start Time:</strong> <span id="summaryStartAt">-</span></p>
+                            <p><strong>Start Altitude:</strong> <span id="summaryStartAlt">-</span> m</p>
+                            <p><strong>End Altitude:</strong> <span id="summaryEndAlt">-</span> m</p>
+                            <p><strong>Altitude Change:</strong> <span id="summaryAltChange">-</span> m</p>
+                            <p><strong>Temperature:</strong> <span id="summaryTemp">-</span> °C</p>
+                            <p><strong>Humidity:</strong> <span id="summaryHumidity">-</span> %</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Altitude Chart -->
+                    <div class="info-card">
+                        <h4 style="margin-top: 0; color: #424242;">Altitude Over Time</h4>
+                        <div style="position: relative; height: 400px;">
+                            <canvas id="altitudeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+            {% else %}
+                <div class="info-card">
+                    <p style="color: #757575;">No climbing sessions yet. Start a session using your device to see data here.</p>
+                </div>
+            {% endif %}
         </div>
 
         <!-- Emergency Contacts Tab -->
@@ -198,6 +287,8 @@
     </div>
 
     <script>
+        let altitudeChart = null;
+        
         function showTab(tabName) {
             // Hide all tabs
             const tabs = document.querySelectorAll('.tab');
@@ -215,6 +306,146 @@
             // For now, just show an alert. You can implement a modal or inline editing later
             alert('Edit functionality for contact ' + contactId + ' - Coming soon!');
             // TODO: Implement edit modal or inline form
+        }
+        
+        async function loadSessionData(sessionId) {
+            try {
+                // Show loading state
+                const detailDiv = document.getElementById('sessionDetail');
+                detailDiv.style.display = 'block';
+                detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Fetch session data
+                const response = await fetch(`/api/session-events/${sessionId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load session data');
+                }
+                
+                const data = await response.json();
+                
+                // Update summary
+                updateSessionSummary(data.session_info);
+                
+                // Create or update chart
+                renderAltitudeChart(data.labels, data.altitudes);
+                
+            } catch (error) {
+                console.error('Error loading session data:', error);
+                alert('Failed to load session data. Please try again.');
+            }
+        }
+        
+        function updateSessionSummary(sessionInfo) {
+            if (sessionInfo.start_at) {
+                const startDate = new Date(sessionInfo.start_at);
+                document.getElementById('summaryStartAt').textContent = startDate.toLocaleString();
+            }
+            
+            document.getElementById('summaryStartAlt').textContent = sessionInfo.start_alt ? sessionInfo.start_alt.toFixed(1) : '-';
+            document.getElementById('summaryEndAlt').textContent = sessionInfo.end_alt ? sessionInfo.end_alt.toFixed(1) : '-';
+            
+            // Calculate altitude change
+            if (sessionInfo.start_alt && sessionInfo.end_alt) {
+                const change = sessionInfo.end_alt - sessionInfo.start_alt;
+                const changeText = change >= 0 ? '+' + change.toFixed(1) : change.toFixed(1);
+                document.getElementById('summaryAltChange').textContent = changeText;
+                document.getElementById('summaryAltChange').style.color = change >= 0 ? '#4CAF50' : '#f44336';
+            } else {
+                document.getElementById('summaryAltChange').textContent = '-';
+            }
+            
+            document.getElementById('summaryTemp').textContent = sessionInfo.temp ? sessionInfo.temp.toFixed(1) : '-';
+            document.getElementById('summaryHumidity').textContent = sessionInfo.humidity ? sessionInfo.humidity.toFixed(1) : '-';
+        }
+        
+        function renderAltitudeChart(labels, altitudes) {
+            const ctx = document.getElementById('altitudeChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (altitudeChart) {
+                altitudeChart.destroy();
+            }
+            
+            // Create new chart
+            altitudeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Altitude (m)',
+                        data: altitudes,
+                        borderColor: '#2196F3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#2196F3',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Altitude: ' + context.parsed.y.toFixed(1) + ' m';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Altitude (meters)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(0) + ' m';
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+        
+        function closeSessionDetail() {
+            const detailDiv = document.getElementById('sessionDetail');
+            detailDiv.style.display = 'none';
+            
+            // Destroy chart to free memory
+            if (altitudeChart) {
+                altitudeChart.destroy();
+                altitudeChart = null;
+            }
         }
     </script>
 </body>
