@@ -7,8 +7,6 @@ import logging
 from src.services.base import BaseService
 import uuid
 
-logger = logging.getLogger(__name__)
-
 
 class MQTTService(BaseService):
     def __init__(
@@ -20,7 +18,7 @@ class MQTTService(BaseService):
         super().__init__()
         self.db_service = db_service
         self.dt_factory = dt_factory
-        self.logger = logging.getLogger(__name__)  # Initialize logger first
+        self.logger = logging.getLogger(__name__)
         self.config = self._load_config(config_path)
         self.client = None
         self.connected = False
@@ -276,7 +274,7 @@ class MQTTService(BaseService):
     def _handle_session_active(
         self, device_serial: str, session_id: str, data: Dict[str, Any]
     ):
-        """Handle ACTIVE session state - create only session_event"""
+        """Handle ACTIVE session state - update climbing_session and create session_event"""
         try:
             # Import DRFactory here to avoid circular imports
             from src.virtualization.digital_replica.dr_factory import DRFactory
@@ -290,6 +288,20 @@ class MQTTService(BaseService):
                     f"Climbing session not found for ACTIVE state: {session_id}"
                 )
                 return
+
+            # Update climbing_session state to ACTIVE (only if not already ACTIVE)
+            current_state = existing_session.get("profile", {}).get("session_state")
+            if current_state != "ACTIVE":
+                session_updates = {"profile": {"session_state": "ACTIVE"}}
+
+                self.db_service.update_dr(
+                    "climbing_session", existing_session["_id"], session_updates
+                )
+                self.logger.info(
+                    f"Updated climbing_session state to ACTIVE: {session_id}"
+                )
+            else:
+                self.logger.debug(f"Session {session_id} already in ACTIVE state")
 
             # Create session_event for ACTIVE
             event_data = {
