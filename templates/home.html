@@ -65,7 +65,7 @@
             <form method="POST" action="/register-device">
                 <div class="form-group">
                     <label for="serial_number">Device Serial Number</label>
-                    <input type="text" id="serial_number" name="serial_number" required placeholder="Enter device serial number (e.g., DEV-2024-001)">
+                    <input type="text" id="serial_number" name="serial_number" required placeholder="Enter device serial number">
                 </div>
                 
                 <button type="submit">Register Device</button>
@@ -83,12 +83,10 @@
                                     <p style="margin: 0;"><strong>{{ device.serial_number }}</strong></p>
                                     {% if device.status == 'active' %}
                                     <span style="background-color: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Active</span>
-                                    {% elif device.status == 'inactive' %}
+                                    {% else %}
                                     <span style="background-color: #9E9E9E; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Inactive</span>
-                                    {% elif device.status == 'maintenance' %}
-                                    <span style="background-color: #FF9800; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Maintenance</span>
                                     {% endif %}
-                                </div>
+                                </div>                                
                                 
                                 <p><strong>Battery:</strong> {{ device.battery_level }}%</p>
                                 

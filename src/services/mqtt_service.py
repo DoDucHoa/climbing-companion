@@ -153,7 +153,7 @@ class MQTTService(BaseService):
             status = data.get("status", "active")
 
             # Check if this is first connection (device was inactive)
-            if device["data"].get("status") == "inactive" and status == "online":
+            if device["data"].get("status") == "inactive" and status == "active":
                 self.logger.info(
                     f"Device {serial_number} connected for first time, activating..."
                 )
@@ -184,7 +184,7 @@ class MQTTService(BaseService):
             self.logger.error(f"Error finding device: {str(e)}")
             return None
 
-    def _auto_pair_device(self, device_id: str, serial_number: str):
+    def _auto_pair_device(self, device_serial: str, serial_number: str):
         """Auto-pair device with user who registered it"""
         try:
             # Find user who registered this device
@@ -195,7 +195,7 @@ class MQTTService(BaseService):
 
             # Check if pairing already exists
             existing_pairing = pairing_collection.find_one(
-                {"data.device_id": device_id}
+                {"data.device_serial": device_serial}
             )
 
             if existing_pairing:

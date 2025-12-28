@@ -128,8 +128,8 @@ def home():
         # Get device details
         device_collection = db_service.db["device_collection"]
         for pairing in pairings:
-            device_id = pairing["data"]["device_id"]
-            device = device_collection.find_one({"_id": device_id})
+            device_serial = pairing["data"]["device_serial"]
+            device = device_collection.find_one({"_id": device_serial})
 
             if device:
                 devices.append(

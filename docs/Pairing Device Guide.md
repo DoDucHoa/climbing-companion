@@ -50,7 +50,7 @@
      ```json
      {
        "serial_number": "[Your input serial number]",
-       "status": "online"
+       "status": "active"
      }
      ```
    - Click "Publish"

@@ -7,7 +7,6 @@ device_api = Blueprint("device_api", __name__)
 
 @device_api.route("/register-device", methods=["POST"])
 def register_device():
-    """Register a new device"""
     try:
         # Check if user is logged in
         if "user_id" not in session:
@@ -36,7 +35,7 @@ def register_device():
             # Check if already paired with this user
             pairing_collection = db_service.db["device_pairing_collection"]
             existing_pairing = pairing_collection.find_one(
-                {"data.device_id": existing_device["_id"], "data.user_id": user_id}
+                {"data.device_serial": serial_number, "data.user_id": user_id}
             )
 
             if existing_pairing:
@@ -64,6 +63,8 @@ def register_device():
         }
 
         device_dr = device_dr_factory.create_dr("device", device_data)
+        # Use serial_number as _id for device
+        device_dr["_id"] = serial_number
         db_service.save_dr("device", device_dr)
 
         # Create device-user pairing using DRFactory
@@ -71,7 +72,7 @@ def register_device():
             "profile": {"paired_at": datetime.utcnow()},
             "data": {
                 "user_id": user_id,
-                "device_id": device_dr["_id"],
+                "device_serial": serial_number,
                 "pairing_status": "active",
                 "pairing_method": "manual",
             },
@@ -96,7 +97,6 @@ def register_device():
 
 @device_api.route("/devices", methods=["GET"])
 def get_user_devices():
-    """Get all devices for logged in user"""
     try:
         if "user_id" not in session:
             return jsonify({"error": "Not authenticated"}), 401
@@ -117,8 +117,8 @@ def get_user_devices():
         devices = []
 
         for pairing in pairings:
-            device_id = pairing["data"]["device_id"]
-            device = device_collection.find_one({"_id": device_id})
+            device_serial = pairing["data"]["device_serial"]
+            device = device_collection.find_one({"_id": device_serial})
 
             if device:
                 devices.append(
@@ -139,9 +139,8 @@ def get_user_devices():
         return jsonify({"error": str(e)}), 500
 
 
-@device_api.route("/device/<device_id>", methods=["GET"])
-def get_device(device_id):
-    """Get device details"""
+@device_api.route("/device/<device_serial>", methods=["GET"])
+def get_device(device_serial):
     try:
         if "user_id" not in session:
             return jsonify({"error": "Not authenticated"}), 401
@@ -153,7 +152,7 @@ def get_device(device_id):
         pairing_collection = db_service.db["device_pairing_collection"]
         pairing = pairing_collection.find_one(
             {
-                "data.device_id": device_id,
+                "data.device_serial": device_serial,
                 "data.user_id": user_id,
                 "data.pairing_status": "active",
             }
@@ -164,7 +163,7 @@ def get_device(device_id):
 
         # Get device
         device_collection = db_service.db["device_collection"]
-        device = device_collection.find_one({"_id": device_id})
+        device = device_collection.find_one({"_id": device_serial})
 
         if not device:
             return jsonify({"error": "Device not found"}), 404
@@ -175,9 +174,9 @@ def get_device(device_id):
         current_app.logger.error(f"Error getting device: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@device_api.route("/device/<device_id>", methods=["DELETE"])
-def unregister_device(device_id):
-    """Unregister device (unpair from user)"""
+
+@device_api.route("/device/<device_serial>", methods=["DELETE"])
+def unregister_device(device_serial):
     try:
         if "user_id" not in session:
             return jsonify({"error": "Not authenticated"}), 401
@@ -189,7 +188,7 @@ def unregister_device(device_id):
         pairing_collection = db_service.db["device_pairing_collection"]
         pairing = pairing_collection.find_one(
             {
-                "data.device_id": device_id,
+                "data.device_serial": device_serial,
                 "data.user_id": user_id,
                 "data.pairing_status": "active",
             }

@@ -10,7 +10,7 @@ schemas:
   entity:
     data:
       user_id: str
-      device_id: str
+      device_serial: str
       unpaired_at: datetime
       pairing_status: str
       pairing_method: str
@@ -21,7 +21,7 @@ schemas:
         - paired_at
       data:
         - user_id
-        - device_id
+        - device_serial
 
     type_constraints:
       pairing_status:
