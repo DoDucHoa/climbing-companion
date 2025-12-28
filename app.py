@@ -39,6 +39,10 @@ class FlaskServer:
         schema_registry.load_schema(
             "device_pairing", "config/device_pairing_schema.yaml"
         )
+        schema_registry.load_schema(
+            "climbing_session", "config/climbing_session_schema.yaml"
+        )
+        schema_registry.load_schema("session_event", "config/session_event_schema.yaml")
 
         # Load database configuration
         db_config = ConfigLoader.load_database_config()
@@ -56,17 +60,23 @@ class FlaskServer:
         dt_factory = DTFactory(db_service, schema_registry)
 
         # Initialize DRFactory instances for each schema type
+        user_dr_factory = DRFactory("config/user_schema.yaml")
         device_dr_factory = DRFactory("config/device_schema.yaml")
         device_pairing_dr_factory = DRFactory("config/device_pairing_schema.yaml")
         emergency_contact_dr_factory = DRFactory("config/emergency_contact_schema.yaml")
+        climbing_session_dr_factory = DRFactory("config/climbing_session_schema.yaml")
+        session_event_dr_factory = DRFactory("config/session_event_schema.yaml")
 
         # Store references
         self.app.config["SCHEMA_REGISTRY"] = schema_registry
         self.app.config["DB_SERVICE"] = db_service
         self.app.config["DT_FACTORY"] = dt_factory
+        self.app.config["USER_DR_FACTORY"] = user_dr_factory
         self.app.config["DEVICE_DR_FACTORY"] = device_dr_factory
         self.app.config["DEVICE_PAIRING_DR_FACTORY"] = device_pairing_dr_factory
         self.app.config["EMERGENCY_CONTACT_DR_FACTORY"] = emergency_contact_dr_factory
+        self.app.config["CLIMBING_SESSION_DR_FACTORY"] = climbing_session_dr_factory
+        self.app.config["SESSION_EVENT_DR_FACTORY"] = session_event_dr_factory
 
     def _init_mqtt(self):
         """Initialize MQTT service for device communication"""

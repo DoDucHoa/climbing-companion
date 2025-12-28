@@ -99,8 +99,10 @@ class MQTTService(BaseService):
             qos = self.config["mqtt"]["qos"]["subscribe"]
 
             self.client.subscribe(topics_config["status"], qos=qos)
+            self.client.subscribe(topics_config["telemetry"], qos=qos)
 
             self.logger.info(f"Subscribed to topic: {topics_config['status']}")
+            self.logger.info(f"Subscribed to topic: {topics_config['telemetry']}")
         else:
             self.logger.error(f"Connection failed with code {rc}")
 
@@ -122,14 +124,17 @@ class MQTTService(BaseService):
             self.logger.debug(f"Payload: {payload}")
 
             # Extract serial number from topic
-            # Topic format: climbing/{serial_number}/status
+            # Topic format: climbing/{serial_number}/status or climbing/{serial_number}
             topic_parts = topic.split("/")
-            if len(topic_parts) >= 3:
+            if len(topic_parts) >= 2:
                 serial_number = topic_parts[1]
-                message_type = topic_parts[2]
+                message_type = topic_parts[2] if len(topic_parts) >= 3 else "telemetry"
 
                 if message_type == "status":
                     self.handle_status(serial_number, payload)
+                else:
+                    # Handle telemetry (session data)
+                    self.handle_telemetry(serial_number, payload)
 
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON payload: {str(e)}")
@@ -173,6 +178,216 @@ class MQTTService(BaseService):
 
         except Exception as e:
             self.logger.error(f"Error handling status update: {str(e)}")
+
+    def handle_telemetry(self, serial_number: str, data: Dict[str, Any]):
+        """Handle telemetry (session) data from device"""
+        try:
+            session_state = data.get("session_state")
+            session_id = data.get("session_id")
+
+            if not session_state or not session_id:
+                self.logger.error(
+                    "Missing session_state or session_id in telemetry data"
+                )
+                return
+
+            self.logger.info(
+                f"Processing {session_state} telemetry for device: {serial_number}, session: {session_id}"
+            )
+
+            # Find device by serial number
+            device = self._find_device_by_serial(serial_number)
+            if not device:
+                self.logger.error(f"Device not found: {serial_number}")
+                return
+
+            # Get user_id from device pairing
+            user_id = self._get_user_from_device(serial_number)
+            if not user_id:
+                self.logger.error(
+                    f"No active pairing found for device: {serial_number}"
+                )
+                return
+
+            # Handle different session states
+            if session_state == "START":
+                self._handle_session_start(serial_number, user_id, session_id, data)
+            elif session_state == "ACTIVE":
+                self._handle_session_active(serial_number, session_id, data)
+            elif session_state == "END":
+                self._handle_session_end(serial_number, session_id, data)
+            else:
+                self.logger.warning(f"Unknown session_state: {session_state}")
+
+        except Exception as e:
+            self.logger.error(f"Error handling telemetry: {str(e)}")
+
+    def _handle_session_start(
+        self, device_serial: str, user_id: str, session_id: str, data: Dict[str, Any]
+    ):
+        """Handle START session state - create climbing_session and session_event"""
+        try:
+            # Import DRFactory here to avoid circular imports
+            from src.virtualization.digital_replica.dr_factory import DRFactory
+
+            climbing_session_factory = DRFactory("config/climbing_session_schema.yaml")
+            session_event_factory = DRFactory("config/session_event_schema.yaml")
+
+            # Create climbing_session
+            session_data = {
+                "profile": {"start_at": datetime.utcnow(), "session_state": "START"},
+                "data": {
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "device_serial": device_serial,
+                    "start_alt": data.get("alt"),
+                    "temp": data.get("temp"),
+                    "humidity": data.get("humidity"),
+                    "latitude": data.get("latitude"),
+                    "longitude": data.get("longitude"),
+                },
+            }
+
+            climbing_session_dr = climbing_session_factory.create_dr(
+                "climbing_session", session_data
+            )
+            self.db_service.save_dr("climbing_session", climbing_session_dr)
+            self.logger.info(f"Created climbing_session: {session_id}")
+
+            # Create session_event for START
+            event_data = {
+                "profile": {"create_at": datetime.utcnow()},
+                "data": {
+                    "session_id": session_id,
+                    "device_serial": device_serial,
+                    "alt": data.get("alt"),
+                },
+            }
+
+            session_event_dr = session_event_factory.create_dr(
+                "session_event", event_data
+            )
+            self.db_service.save_dr("session_event", session_event_dr)
+            self.logger.info(f"Created session_event for START: {session_id}")
+
+        except Exception as e:
+            self.logger.error(f"Error handling session START: {str(e)}")
+
+    def _handle_session_active(
+        self, device_serial: str, session_id: str, data: Dict[str, Any]
+    ):
+        """Handle ACTIVE session state - create only session_event"""
+        try:
+            # Import DRFactory here to avoid circular imports
+            from src.virtualization.digital_replica.dr_factory import DRFactory
+
+            session_event_factory = DRFactory("config/session_event_schema.yaml")
+
+            # Verify climbing_session exists
+            existing_session = self._find_session_by_id(session_id)
+            if not existing_session:
+                self.logger.error(
+                    f"Climbing session not found for ACTIVE state: {session_id}"
+                )
+                return
+
+            # Create session_event for ACTIVE
+            event_data = {
+                "profile": {"create_at": datetime.utcnow()},
+                "data": {
+                    "session_id": session_id,
+                    "device_serial": device_serial,
+                    "alt": data.get("alt"),
+                },
+            }
+
+            session_event_dr = session_event_factory.create_dr(
+                "session_event", event_data
+            )
+            self.db_service.save_dr("session_event", session_event_dr)
+            self.logger.info(
+                f"Created session_event for ACTIVE: {session_id}, alt: {data.get('alt')}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error handling session ACTIVE: {str(e)}")
+
+    def _handle_session_end(
+        self, device_serial: str, session_id: str, data: Dict[str, Any]
+    ):
+        """Handle END session state - update climbing_session and create final session_event"""
+        try:
+            # Import DRFactory here to avoid circular imports
+            from src.virtualization.digital_replica.dr_factory import DRFactory
+
+            session_event_factory = DRFactory("config/session_event_schema.yaml")
+
+            # Find climbing_session
+            existing_session = self._find_session_by_id(session_id)
+            if not existing_session:
+                self.logger.error(
+                    f"Climbing session not found for END state: {session_id}"
+                )
+                return
+
+            # Update climbing_session with end data
+            session_updates = {
+                "profile": {"session_state": "END"},
+                "data": {"end_alt": data.get("alt"), "end_at": datetime.utcnow()},
+            }
+
+            self.db_service.update_dr(
+                "climbing_session", existing_session["_id"], session_updates
+            )
+            self.logger.info(f"Updated climbing_session with END data: {session_id}")
+
+            # Create session_event for END
+            event_data = {
+                "profile": {"create_at": datetime.utcnow()},
+                "data": {
+                    "session_id": session_id,
+                    "device_serial": device_serial,
+                    "alt": data.get("alt"),
+                },
+            }
+
+            session_event_dr = session_event_factory.create_dr(
+                "session_event", event_data
+            )
+            self.db_service.save_dr("session_event", session_event_dr)
+            self.logger.info(f"Created session_event for END: {session_id}")
+
+        except Exception as e:
+            self.logger.error(f"Error handling session END: {str(e)}")
+
+    def _get_user_from_device(self, device_serial: str) -> Optional[str]:
+        """Get user_id from device_pairing by device serial number"""
+        try:
+            pairing_collection = self.db_service.db["device_pairing_collection"]
+
+            # Find active pairing for this device
+            pairing = pairing_collection.find_one(
+                {"data.device_serial": device_serial, "data.pairing_status": "active"}
+            )
+
+            if pairing:
+                return pairing["data"]["user_id"]
+
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Error getting user from device pairing: {str(e)}")
+            return None
+
+    def _find_session_by_id(self, session_id: str) -> Optional[Dict]:
+        """Find climbing_session by session_id"""
+        try:
+            collection = self.db_service.db["climbing_session_collection"]
+            session = collection.find_one({"data.session_id": session_id})
+            return session
+        except Exception as e:
+            self.logger.error(f"Error finding session: {str(e)}")
+            return None
 
     def _find_device_by_serial(self, serial_number: str) -> Optional[Dict]:
         """Find device DR by serial number"""
@@ -219,7 +434,9 @@ class MQTTService(BaseService):
             self.connected = False
             self.logger.info("Disconnected from MQTT broker")
 
-    def execute(self, data: Dict, dr_type: str = None, attribute: str = None):
+    def execute(
+        self, data: Dict, dr_type: Optional[str] = None, attribute: Optional[str] = None
+    ):
         """Execute service - required by BaseService"""
         # This service runs continuously, not on-demand
         return {"status": "MQTT service running", "connected": self.connected}

@@ -32,25 +32,25 @@
             {% endif %}
             
             <div class="info-card">
-                <p><strong>Email:</strong> {{ user.email }}</p>
-                <p><strong>Member since:</strong> {{ user.created_at or 'N/A' }}</p>
+                <p><strong>Email:</strong> {{ user.profile.email }}</p>
+                <p><strong>Member since:</strong> {{ user.metadata.created_at.strftime('%Y-%m-%d') if user.metadata.created_at else 'N/A' }}</p>
             </div>
 
             <form method="POST" action="/update-profile">
                 <div class="form-group">
                     <label for="name">Full Name</label>
-                    <input type="text" id="name" name="name" value="{{ user.name }}" required placeholder="Enter your full name">
+                    <input type="text" id="name" name="name" value="{{ user.profile.name }}" required placeholder="Enter your full name">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" name="phone" value="{{ user.phone or '' }}" placeholder="Enter your phone number">
+                        <input type="tel" id="phone" name="phone" value="{{ user.profile.phone or '' }}" placeholder="Enter your phone number">
                     </div>
                     
                     <div class="form-group">
                         <label for="dob">Date of Birth</label>
-                        <input type="date" id="dob" name="dob" value="{{ user.dob or '' }}">
+                        <input type="date" id="dob" name="dob" value="{% if user.profile.date_of_birth %}{{ user.profile.date_of_birth.strftime('%Y-%m-%d') if user.profile.date_of_birth is not string else user.profile.date_of_birth }}{% endif %}">
                     </div>
                 </div>
                 

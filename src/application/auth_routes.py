@@ -8,7 +8,6 @@ from flask import (
     current_app,
 )
 from datetime import datetime
-from bson import ObjectId
 
 # Create blueprint for authentication
 auth_bp = Blueprint("auth", __name__)
@@ -28,14 +27,16 @@ def login():
         # Get database service from app config
         db_service = current_app.config["DB_SERVICE"]
 
-        # Find user in database
-        user = db_service.db["users"].find_one({"email": email, "password": password})
+        # Find user in database using proper collection name
+        user = db_service.db["user_collection"].find_one(
+            {"profile.email": email, "data.password": password}
+        )
 
         if user:
             # Store user info in session
-            session["user_id"] = str(user["_id"])
-            session["user_name"] = user["name"]
-            session["user_email"] = user["email"]
+            session["user_id"] = user["_id"]
+            session["user_name"] = user["profile"]["name"]
+            session["user_email"] = user["profile"]["email"]
             return redirect(url_for("auth.home"))
         else:
             return render_template("login.html", error="Wrong email or password!")
@@ -51,24 +52,31 @@ def register():
         email = request.form.get("email")
         password = request.form.get("password")
 
-        # Get database service from app config
+        # Get database service and DR factory from app config
         db_service = current_app.config["DB_SERVICE"]
+        user_dr_factory = current_app.config["USER_DR_FACTORY"]
 
         # Check if email already exists
-        existing_user = db_service.db["users"].find_one({"email": email})
-        if existing_user:
+        existing_users = db_service.query_drs("user", {"profile.email": email})
+        if existing_users:
             return render_template("register.html", error="Email has been used!")
 
-        # Create new user document
-        user_doc = {
-            "name": name,
-            "email": email,
-            "password": password,  # No encryption for demo purposes
-            "created_at": datetime.utcnow(),
+        # Create new user using DR Factory pattern
+        initial_data = {
+            "profile": {
+                "name": name,
+                "email": email,
+            },
+            "data": {
+                "password": password,  # No encryption for demo purposes
+            },
         }
 
-        # Insert user into database
-        db_service.db["users"].insert_one(user_doc)
+        # Create DR using factory (validates with Pydantic)
+        user_dr = user_dr_factory.create_dr("user", initial_data)
+
+        # Save to database using proper method
+        db_service.save_dr("user", user_dr)
 
         # Redirect to login with success message
         return redirect(
@@ -87,13 +95,14 @@ def home():
     # Get full user data from database
     db_service = current_app.config["DB_SERVICE"]
 
-    # Convert string ID back to ObjectId for MongoDB query
+    # Get user from database using proper collection
     try:
-        user = db_service.db["users"].find_one(
-            {"_id": ObjectId(session.get("user_id"))}
+        user = db_service.db["user_collection"].find_one(
+            {"_id": session.get("user_id")}
         )
-    except:
-        # If conversion fails, clear session and redirect to login
+    except Exception as e:
+        # If query fails, clear session and redirect to login
+        print(f"Error fetching user: {e}")
         session.clear()
         return redirect(url_for("auth.login"))
 
@@ -179,17 +188,28 @@ def update_profile():
         # Get database service
         db_service = current_app.config["DB_SERVICE"]
 
-        # Update user in database
+        # Convert date string to datetime if provided
+        date_of_birth = None
+        if dob:
+            try:
+                date_of_birth = datetime.strptime(dob, "%Y-%m-%d")
+            except ValueError:
+                pass
+
+        # Update user in database using proper DR structure
         update_data = {
-            "name": name,
-            "phone": phone,
-            "dob": dob,
-            "updated_at": datetime.utcnow(),
+            "profile": {
+                "name": name,
+            },
         }
 
-        db_service.db["users"].update_one(
-            {"_id": ObjectId(session.get("user_id"))}, {"$set": update_data}
-        )
+        # Only add optional fields if they have values
+        if phone:
+            update_data["profile"]["phone"] = phone
+        if date_of_birth:
+            update_data["profile"]["date_of_birth"] = date_of_birth
+
+        db_service.update_dr("user", session.get("user_id"), update_data)
 
         # Update session name
         session["user_name"] = name

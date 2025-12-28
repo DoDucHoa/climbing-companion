@@ -13,6 +13,7 @@ schemas:
   # Entity-specific fields for USER
   entity:
     data:
+      password: str
       user_preferences: Dict
       profile_picture_url: str
       is_active: bool
