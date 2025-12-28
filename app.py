@@ -10,11 +10,14 @@ from src.application.auth_routes import auth_bp
 from config.config_loader import ConfigLoader
 import os
 import logging
+from werkzeug.serving import is_running_from_reloader
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Configure logging only once (not in reloader parent process)
+if not is_running_from_reloader():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
 
 class FlaskServer:
@@ -80,6 +83,10 @@ class FlaskServer:
 
     def _init_mqtt(self):
         """Initialize MQTT service for device communication"""
+        # Only initialize MQTT in the child process to avoid duplicate subscriptions
+        if is_running_from_reloader():
+            return
+
         try:
             db_service = self.app.config["DB_SERVICE"]
             dt_factory = self.app.config["DT_FACTORY"]
