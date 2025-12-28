@@ -2,7 +2,8 @@ import logging
 from typing import Dict, Any, Optional, List
 import yaml
 import requests
-from urllib.parse import quote
+import threading
+import time
 
 
 class TelegramService:
@@ -12,6 +13,10 @@ class TelegramService:
         self.config = self._load_config(config_path)
         self.bot_token = None
         self.api_url = None
+        self.mqtt_service = None  # Will be set later
+        self.polling_thread = None
+        self.polling_active = False
+        self.last_update_id = 0
         self._init_bot()
 
     def _load_config(self, path: str) -> Dict:
@@ -204,3 +209,300 @@ class TelegramService:
         except Exception as e:
             self.logger.error(f"Error retrieving user info: {str(e)}")
             return None
+
+    def set_mqtt_service(self, mqtt_service):
+        """Set MQTT service reference for sending device requests"""
+        self.mqtt_service = mqtt_service
+        self.logger.info("MQTT service reference set for Telegram bot")
+
+    def start_polling(self):
+        """Start Telegram bot polling in a separate thread"""
+        if self.polling_active:
+            self.logger.warning("Telegram polling already active")
+            return
+
+        self.polling_active = True
+        self.polling_thread = threading.Thread(target=self._polling_loop, daemon=True)
+        self.polling_thread.start()
+        self.logger.info("Telegram bot polling started")
+
+    def stop_polling(self):
+        """Stop Telegram bot polling"""
+        self.polling_active = False
+        if self.polling_thread:
+            self.polling_thread.join(timeout=5)
+        self.logger.info("Telegram bot polling stopped")
+
+    def _polling_loop(self):
+        """Main polling loop to get updates from Telegram"""
+        self.logger.info("Telegram polling loop started")
+
+        while self.polling_active:
+            try:
+                # Get updates from Telegram
+                updates = self._get_updates()
+
+                if updates:
+                    for update in updates:
+                        self._process_update(update)
+                        # Update last_update_id to acknowledge this update
+                        self.last_update_id = update.get("update_id", 0)
+
+                # Sleep briefly to avoid hammering the API
+                time.sleep(1)
+
+            except Exception as e:
+                self.logger.error(f"Error in polling loop: {str(e)}")
+                time.sleep(5)  # Wait longer on error
+
+    def _get_updates(self) -> List[Dict]:
+        """Get updates from Telegram using long polling"""
+        try:
+            url = f"{self.api_url}/getUpdates"
+            params = {
+                "offset": self.last_update_id + 1,
+                "timeout": 30,  # Long polling timeout
+                "allowed_updates": ["message"],
+            }
+
+            response = requests.get(url, params=params, timeout=35)
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("ok"):
+                    return result.get("result", [])
+            else:
+                self.logger.error(f"Failed to get updates: {response.status_code}")
+
+        except requests.exceptions.Timeout:
+            # Timeout is normal for long polling
+            pass
+        except Exception as e:
+            self.logger.error(f"Error getting updates: {str(e)}")
+
+        return []
+
+    def _process_update(self, update: Dict):
+        """Process a single update from Telegram"""
+        try:
+            message = update.get("message")
+            if not message:
+                return
+
+            chat_id = message.get("chat", {}).get("id")
+            text = message.get("text", "")
+
+            if not chat_id:
+                return
+
+            self.logger.info(f"Received message from chat_id {chat_id}: {text}")
+
+            # Handle commands
+            if text.startswith("/"):
+                self._handle_command(chat_id, text)
+
+        except Exception as e:
+            self.logger.error(f"Error processing update: {str(e)}")
+
+    def _handle_command(self, chat_id: int, command: str):
+        """Handle Telegram bot commands"""
+        try:
+            command = command.strip().lower()
+
+            if command == "/check_status":
+                self._handle_check_status(chat_id)
+            elif command == "/start":
+                self._send_telegram_message(
+                    str(chat_id),
+                    "🏔️ *Climbing Companion Bot*\n\n"
+                    "Available commands:\n"
+                    "/check_status - Get current location and status of your climber",
+                )
+            else:
+                self._send_telegram_message(
+                    str(chat_id),
+                    f"Unknown command: {command}\n\n"
+                    "Available commands:\n"
+                    "/check_status - Get current location and status",
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error handling command: {str(e)}")
+
+    def _handle_check_status(self, chat_id: int):
+        """Handle /check_status command from emergency contact"""
+        try:
+            self.logger.info(f"Processing /check_status from chat_id: {chat_id}")
+
+            # Find emergency contact by telegram_chat_id
+            emergency_contact = self._find_emergency_contact_by_chat_id(str(chat_id))
+
+            if not emergency_contact:
+                self._send_telegram_message(
+                    str(chat_id),
+                    "❌ You are not registered as an emergency contact.\n\n"
+                    "Please contact the climber to add you as an emergency contact.",
+                )
+                return
+
+            # Get user_id from emergency contact
+            user_id = emergency_contact.get("data", {}).get("user_id")
+            contact_name = emergency_contact.get("profile", {}).get(
+                "name", "Emergency Contact"
+            )
+
+            if not user_id:
+                self._send_telegram_message(
+                    str(chat_id),
+                    "❌ Error: User ID not found in emergency contact record.",
+                )
+                return
+
+            # Get user info
+            user = self._get_user_info(user_id)
+            if not user:
+                self._send_telegram_message(str(chat_id), "❌ Error: User not found.")
+                return
+
+            user_name = user.get("profile", {}).get("name", "Unknown")
+
+            # Find active device for user
+            device = self._find_user_active_device(user_id)
+
+            if not device:
+                self._send_telegram_message(
+                    str(chat_id),
+                    f"⚠️ No active device found for *{user_name}*.\n\n"
+                    "The climber may not have a device paired or the device is offline.",
+                )
+                return
+
+            device_serial = device.get("data", {}).get("serial_number")
+
+            # Send "processing" message
+            self._send_telegram_message(
+                str(chat_id),
+                f"⏳ Requesting status from *{user_name}*'s device...\n\n"
+                f"Device: `{device_serial}`",
+            )
+
+            # Request data from device via MQTT
+            if self.mqtt_service:
+                request_data = {
+                    "request_type": "status_check",
+                    "chat_id": str(chat_id),
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "contact_name": contact_name,
+                }
+
+                success = self.mqtt_service.request_device_status(
+                    device_serial, request_data
+                )
+
+                if not success:
+                    self._send_telegram_message(
+                        str(chat_id),
+                        "❌ Failed to send request to device.\n\n"
+                        "The device may be offline or unreachable.",
+                    )
+            else:
+                self._send_telegram_message(
+                    str(chat_id), "❌ Error: MQTT service not available."
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error handling check_status: {str(e)}")
+            self._send_telegram_message(
+                str(chat_id), f"❌ Error processing request: {str(e)}"
+            )
+
+    def _find_emergency_contact_by_chat_id(self, chat_id: str) -> Optional[Dict]:
+        """Find emergency contact by Telegram chat_id"""
+        try:
+            collection = self.db_service.db["emergency_contact_collection"]
+            contact = collection.find_one({"profile.telegram_chat_id": chat_id})
+            return contact
+        except Exception as e:
+            self.logger.error(f"Error finding emergency contact: {str(e)}")
+            return None
+
+    def _find_user_active_device(self, user_id: str) -> Optional[Dict]:
+        """Find active paired device for user"""
+        try:
+            # Find active device pairing
+            pairing_collection = self.db_service.db["device_pairing_collection"]
+            pairing = pairing_collection.find_one(
+                {"data.user_id": user_id, "data.is_active": True}
+            )
+
+            if not pairing:
+                return None
+
+            device_id = pairing.get("data", {}).get("device_id")
+
+            # Get device
+            device_collection = self.db_service.db["device_collection"]
+            device = device_collection.find_one(
+                {"_id": device_id, "data.status": "active"}
+            )
+
+            return device
+
+        except Exception as e:
+            self.logger.error(f"Error finding active device: {str(e)}")
+            return None
+
+    def send_status_response(
+        self,
+        chat_id: str,
+        user_name: str,
+        session_state: str,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        altitude: Optional[float] = None,
+        temperature: Optional[float] = None,
+        humidity: Optional[float] = None,
+        device_serial: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ):
+        """Send status response back to emergency contact"""
+        try:
+            message = f"*Status Update for {user_name}*\n\n"
+
+            # Session state
+            state_emoji = {"START": "🟢", "ACTIVE": "🟡", "END": "⚫", "INCIDENT": "🔴"}
+            emoji = state_emoji.get(session_state, "⚪")
+            message += f"*Session State:* {emoji} `{session_state}`\n\n"
+
+            # Location
+            message += f"*Location:*\n"
+            if latitude is not None and longitude is not None:
+                message += f"• Latitude: `{latitude:.6f}`\n"
+                message += f"• Longitude: `{longitude:.6f}`\n"
+                maps_url = f"https://www.google.com/maps?q={latitude},{longitude}"
+                message += f"• [View on Google Maps]({maps_url})\n"
+            else:
+                message += f"• Location: _Not available_\n"
+
+            if altitude is not None:
+                message += f"• Altitude: `{altitude:.1f}` meters\n"
+
+            # Environmental data
+            if temperature is not None or humidity is not None:
+                message += f"\n*Environmental:*\n"
+                if temperature is not None:
+                    message += f"• Temperature: `{temperature:.1f}`°C\n"
+                if humidity is not None:
+                    message += f"• Humidity: `{humidity:.1f}`%\n"
+
+            # Device info
+            message += f"\n*Device:* `{device_serial or 'Unknown'}`\n"
+
+            message += f"\n_Last updated: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}_"
+
+            self._send_telegram_message(chat_id, message)
+            self.logger.info(f"Status response sent to chat_id: {chat_id}")
+
+        except Exception as e:
+            self.logger.error(f"Error sending status response: {str(e)}")

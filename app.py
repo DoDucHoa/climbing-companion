@@ -110,6 +110,14 @@ class FlaskServer:
 
             self.app.config["MQTT_SERVICE"] = mqtt_service
             self.app.logger.info("MQTT Service initialized successfully")
+
+            # Set bidirectional reference between services
+            if telegram_service:
+                telegram_service.set_mqtt_service(mqtt_service)
+                # Start Telegram bot polling
+                telegram_service.start_polling()
+                self.app.logger.info("Telegram bot polling started")
+
         except Exception as e:
             self.app.logger.error(f"Failed to initialize MQTT service: {str(e)}")
             # Continue without MQTT - application can still work for other features
@@ -125,6 +133,8 @@ class FlaskServer:
             self.app.run(host=host, port=port, debug=debug)
         finally:
             # Cleanup on server shutdown
+            if "TELEGRAM_SERVICE" in self.app.config:
+                self.app.config["TELEGRAM_SERVICE"].stop_polling()
             if "MQTT_SERVICE" in self.app.config:
                 self.app.config["MQTT_SERVICE"].disconnect()
             if "DB_SERVICE" in self.app.config:

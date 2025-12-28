@@ -100,9 +100,13 @@ class MQTTService(BaseService):
 
             self.client.subscribe(topics_config["status"], qos=qos)
             self.client.subscribe(topics_config["telemetry"], qos=qos)
+            self.client.subscribe(topics_config["telegram_response"], qos=qos)
 
             self.logger.info(f"Subscribed to topic: {topics_config['status']}")
             self.logger.info(f"Subscribed to topic: {topics_config['telemetry']}")
+            self.logger.info(
+                f"Subscribed to topic: {topics_config['telegram_response']}"
+            )
         else:
             self.logger.error(f"Connection failed with code {rc}")
 
@@ -132,6 +136,8 @@ class MQTTService(BaseService):
 
                 if message_type == "status":
                     self.handle_status(serial_number, payload)
+                elif message_type == "telegram":
+                    self.handle_telegram_response(serial_number, payload)
                 else:
                     # Handle telemetry (session data)
                     self.handle_telemetry(serial_number, payload)
@@ -517,6 +523,82 @@ class MQTTService(BaseService):
             self.client.disconnect()
             self.connected = False
             self.logger.info("Disconnected from MQTT broker")
+
+    def request_device_status(
+        self, device_serial: str, request_data: Dict[str, Any]
+    ) -> bool:
+        """Request status from device for Telegram bot"""
+        try:
+            if not self.connected:
+                self.logger.error("MQTT not connected - cannot send request")
+                return False
+
+            # Build request topic: climbing/{serial}/request
+            topic = self.config["mqtt"]["topics"]["device_request"].format(
+                serial=device_serial
+            )
+            qos = self.config["mqtt"]["qos"]["publish"]
+
+            # Add timestamp
+            request_data["timestamp"] = datetime.utcnow().isoformat()
+
+            # Publish request
+            payload = json.dumps(request_data)
+            result = self.client.publish(topic, payload, qos=qos)
+
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                self.logger.info(f"Status request sent to device: {device_serial}")
+                return True
+            else:
+                self.logger.error(f"Failed to publish request: {result.rc}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Error requesting device status: {str(e)}")
+            return False
+
+    def handle_telegram_response(self, serial_number: str, data: Dict[str, Any]):
+        """Handle response from device for Telegram status check"""
+        try:
+            self.logger.info(
+                f"Processing Telegram response from device: {serial_number}"
+            )
+
+            # Extract data from response
+            chat_id = data.get("chat_id")
+            user_name = data.get("user_name")
+            session_state = data.get("session_state", "UNKNOWN")
+            latitude = data.get("latitude")
+            longitude = data.get("longitude")
+            altitude = data.get("alt")
+            temperature = data.get("temp")
+            humidity = data.get("humidity")
+            session_id = data.get("session_id")
+
+            if not chat_id:
+                self.logger.error("No chat_id in Telegram response")
+                return
+
+            # Send response via Telegram service
+            if self.telegram_service:
+                self.telegram_service.send_status_response(
+                    chat_id=str(chat_id),
+                    user_name=user_name or "Unknown",
+                    session_state=session_state,
+                    latitude=latitude,
+                    longitude=longitude,
+                    altitude=altitude,
+                    temperature=temperature,
+                    humidity=humidity,
+                    device_serial=serial_number,
+                    session_id=session_id,
+                )
+                self.logger.info(f"Status response sent to chat_id: {chat_id}")
+            else:
+                self.logger.error("Telegram service not available")
+
+        except Exception as e:
+            self.logger.error(f"Error handling Telegram response: {str(e)}")
 
     def execute(
         self, data: Dict, dr_type: Optional[str] = None, attribute: Optional[str] = None
