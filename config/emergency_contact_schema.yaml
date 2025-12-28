@@ -24,7 +24,7 @@ schemas:
     mandatory_fields:
       profile:
         - name
-        - phone
+        - telegram_chat_id
       data:
         - user_id
       metadata:
@@ -36,12 +36,6 @@ schemas:
       name:
         min_length: 2
         max_length: 100
-      
-      phone:
-        pattern: "^\\+?[0-9]{10,15}$"  # Phone format validation
-      
-      email:
-        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"  # Email format validation
       
       telegram_chat_id:
         pattern: "^[0-9]+$"  # Telegram chat ID must be numeric

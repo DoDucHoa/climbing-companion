@@ -1,0 +1,18 @@
+telegram:
+  # Telegram Bot Configuration
+  bot_token: "8506306127:AAH7Y-5NAqRl27XXdXEBNc8KU826k9PFrdo"
+  
+  # Message settings
+  message:
+    parse_mode: "Markdown"  # Can be "Markdown" or "HTML"
+    timeout: 30  # Seconds to wait for message send
+    
+  # Alert settings
+  alerts:
+    max_retries: 3  # Number of retries if message fails
+    retry_delay: 2  # Seconds between retries
+    
+  # Feature flags
+  features:
+    enable_location_map: true  # Include Google Maps link
+    enable_altitude: true  # Include altitude information

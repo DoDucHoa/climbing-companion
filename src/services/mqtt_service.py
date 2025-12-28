@@ -13,11 +13,13 @@ class MQTTService(BaseService):
         self,
         db_service,
         dt_factory,
+        telegram_service=None,
         config_path: str = "config/mqtt_config.yaml",
     ):
         super().__init__()
         self.db_service = db_service
         self.dt_factory = dt_factory
+        self.telegram_service = telegram_service
         self.logger = logging.getLogger(__name__)
         self.config = self._load_config(config_path)
         self.client = None
@@ -214,6 +216,8 @@ class MQTTService(BaseService):
                 self._handle_session_active(serial_number, session_id, data)
             elif session_state == "END":
                 self._handle_session_end(serial_number, session_id, data)
+            elif session_state == "INCIDENT":
+                self._handle_session_incident(serial_number, user_id, session_id, data)
             else:
                 self.logger.warning(f"Unknown session_state: {session_state}")
 
@@ -371,6 +375,74 @@ class MQTTService(BaseService):
 
         except Exception as e:
             self.logger.error(f"Error handling session END: {str(e)}")
+
+    def _handle_session_incident(
+        self, device_serial: str, user_id: str, session_id: str, data: Dict[str, Any]
+    ):
+        """Handle INCIDENT session state - update session, create event, and send Telegram alerts"""
+        try:
+            # Import DRFactory here to avoid circular imports
+            from src.virtualization.digital_replica.dr_factory import DRFactory
+
+            session_event_factory = DRFactory("config/session_event_schema.yaml")
+
+            # Find climbing_session
+            existing_session = self._find_session_by_id(session_id)
+            if not existing_session:
+                self.logger.error(
+                    f"Climbing session not found for INCIDENT state: {session_id}"
+                )
+                return
+
+            # Update climbing_session state to INCIDENT
+            session_updates = {"profile": {"session_state": "INCIDENT"}}
+
+            self.db_service.update_dr(
+                "climbing_session", existing_session["_id"], session_updates
+            )
+            self.logger.info(
+                f"Updated climbing_session state to INCIDENT: {session_id}"
+            )
+
+            # Create session_event for INCIDENT
+            event_data = {
+                "profile": {"create_at": datetime.utcnow()},
+                "data": {
+                    "session_id": session_id,
+                    "device_serial": device_serial,
+                    "alt": data.get("alt"),
+                },
+            }
+
+            session_event_dr = session_event_factory.create_dr(
+                "session_event", event_data
+            )
+            self.db_service.save_dr("session_event", session_event_dr)
+            self.logger.info(f"Created session_event for INCIDENT: {session_id}")
+
+            # Send emergency alert via Telegram
+            if self.telegram_service:
+                self.logger.info(
+                    f"Sending emergency alert for user: {user_id}, session: {session_id}"
+                )
+
+                alert_result = self.telegram_service.send_emergency_alert(
+                    user_id=user_id,
+                    session_id=session_id,
+                    latitude=data.get("latitude"),
+                    longitude=data.get("longitude"),
+                    altitude=data.get("alt"),
+                    device_serial=device_serial,
+                )
+
+                self.logger.info(f"Telegram alert result: {alert_result}")
+            else:
+                self.logger.warning(
+                    "Telegram service not available - emergency alert not sent"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error handling session INCIDENT: {str(e)}")
 
     def _get_user_from_device(self, device_serial: str) -> Optional[str]:
         """Get user_id from device_pairing by device serial number"""

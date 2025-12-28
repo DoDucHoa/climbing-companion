@@ -5,6 +5,7 @@ from src.virtualization.digital_replica.dr_factory import DRFactory
 from src.services.database_service import DatabaseService
 from src.digital_twin.dt_factory import DTFactory
 from src.services.mqtt_service import MQTTService
+from src.services.telegram_service import TelegramService
 from src.application.api import register_api_blueprints
 from src.application.auth_routes import auth_bp
 from config.config_loader import ConfigLoader
@@ -91,7 +92,20 @@ class FlaskServer:
             db_service = self.app.config["DB_SERVICE"]
             dt_factory = self.app.config["DT_FACTORY"]
 
-            mqtt_service = MQTTService(db_service, dt_factory)
+            # Initialize Telegram service
+            telegram_service = None
+            try:
+                telegram_service = TelegramService(db_service)
+                self.app.config["TELEGRAM_SERVICE"] = telegram_service
+                self.app.logger.info("Telegram Service initialized successfully")
+            except Exception as e:
+                self.app.logger.warning(
+                    f"Failed to initialize Telegram service: {str(e)}"
+                )
+                self.app.logger.warning("Continuing without Telegram alerts")
+
+            # Initialize MQTT service with Telegram service
+            mqtt_service = MQTTService(db_service, dt_factory, telegram_service)
             mqtt_service.connect()
 
             self.app.config["MQTT_SERVICE"] = mqtt_service
