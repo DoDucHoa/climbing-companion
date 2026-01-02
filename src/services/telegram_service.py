@@ -314,7 +314,7 @@ class TelegramService:
             elif command == "/start":
                 self._send_telegram_message(
                     str(chat_id),
-                    "🏔️ *Climbing Companion Bot*\n\n"
+                    "*Climbing Companion Bot*\n\n"
                     "Available commands:\n"
                     "/check_status - Get current location and status of your climber",
                 )
@@ -377,12 +377,12 @@ class TelegramService:
                 )
                 return
 
-            device_serial = device.get("data", {}).get("serial_number")
+            device_serial = device.get("profile", {}).get("serial_number")
 
             # Send "processing" message
             self._send_telegram_message(
                 str(chat_id),
-                f"⏳ Requesting status from *{user_name}*'s device...\n\n"
+                f"Requesting status from *{user_name}*'s device...\n\n"
                 f"Device: `{device_serial}`",
             )
 
@@ -433,18 +433,18 @@ class TelegramService:
             # Find active device pairing
             pairing_collection = self.db_service.db["device_pairing_collection"]
             pairing = pairing_collection.find_one(
-                {"data.user_id": user_id, "data.is_active": True}
+                {"data.user_id": user_id, "data.pairing_status": "active"}
             )
 
             if not pairing:
                 return None
 
-            device_id = pairing.get("data", {}).get("device_id")
+            device_serial = pairing.get("data", {}).get("device_serial")
 
             # Get device
             device_collection = self.db_service.db["device_collection"]
             device = device_collection.find_one(
-                {"_id": device_id, "data.status": "active"}
+                {"_id": device_serial, "data.status": "active"}
             )
 
             return device

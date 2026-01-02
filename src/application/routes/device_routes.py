@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, session, redirect, url_for
 from datetime import datetime
-import uuid
 
 device_api = Blueprint("device_api", __name__)
 
@@ -31,20 +30,64 @@ def register_device():
             {"profile.serial_number": serial_number}
         )
 
+        pairing_collection = db_service.db["device_pairing_collection"]
+
         if existing_device:
-            # Check if already paired with this user
-            pairing_collection = db_service.db["device_pairing_collection"]
-            existing_pairing = pairing_collection.find_one(
-                {"data.device_serial": serial_number, "data.user_id": user_id}
+            # Check if already paired with this user (active pairing only)
+            active_pairing = pairing_collection.find_one(
+                {
+                    "data.device_serial": serial_number,
+                    "data.user_id": user_id,
+                    "data.pairing_status": "active",
+                }
             )
 
-            if existing_pairing:
+            if active_pairing:
                 return redirect(
                     url_for(
                         "auth.home", error="Device already registered to your account"
                     )
                 )
-            else:
+
+            # Check if device was previously unpaired by this user
+            unpaired_pairing = pairing_collection.find_one(
+                {
+                    "data.device_serial": serial_number,
+                    "data.user_id": user_id,
+                    "data.pairing_status": "unpaired",
+                }
+            )
+
+            if unpaired_pairing:
+                # Reactivate the existing pairing
+                pairing_collection.update_one(
+                    {"_id": unpaired_pairing["_id"]},
+                    {
+                        "$set": {
+                            "data.pairing_status": "active",
+                            "profile.paired_at": datetime.utcnow(),
+                            "metadata.updated_at": datetime.utcnow(),
+                        },
+                        "$unset": {"data.unpaired_at": ""},
+                    },
+                )
+
+                return redirect(
+                    url_for(
+                        "auth.home",
+                        success="Device re-registered successfully.",
+                    )
+                )
+
+            # Check if paired with another user
+            other_user_pairing = pairing_collection.find_one(
+                {
+                    "data.device_serial": serial_number,
+                    "data.pairing_status": "active",
+                }
+            )
+
+            if other_user_pairing:
                 return redirect(
                     url_for(
                         "auth.home",
@@ -52,20 +95,21 @@ def register_device():
                     )
                 )
 
-        # Create device DR using DRFactory
-        device_data = {
-            "profile": {"serial_number": serial_number},
-            "data": {
-                "status": "inactive",  # Will become active when device connects
-                "battery_level": 100,
-                "settings": {"sync_interval": 300},
-            },
-        }
+        # Create device DR using DRFactory (if it doesn't exist)
+        if not existing_device:
+            device_data = {
+                "profile": {"serial_number": serial_number},
+                "data": {
+                    "status": "inactive",  # Will become active when device connects
+                    "battery_level": 100,
+                    "settings": {"sync_interval": 300},
+                },
+            }
 
-        device_dr = device_dr_factory.create_dr("device", device_data)
-        # Use serial_number as _id for device
-        device_dr["_id"] = serial_number
-        db_service.save_dr("device", device_dr)
+            device_dr = device_dr_factory.create_dr("device", device_data)
+            # Use serial_number as _id for device
+            device_dr["_id"] = serial_number
+            db_service.save_dr("device", device_dr)
 
         # Create device-user pairing using DRFactory
         pairing_data = {
@@ -84,7 +128,7 @@ def register_device():
         return redirect(
             url_for(
                 "auth.home",
-                success="Device registered successfully. Waiting for device to connect...",
+                success="Device registered successfully.",
             )
         )
 
@@ -172,45 +216,4 @@ def get_device(device_serial):
 
     except Exception as e:
         current_app.logger.error(f"Error getting device: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-
-@device_api.route("/device/<device_serial>", methods=["DELETE"])
-def unregister_device(device_serial):
-    try:
-        if "user_id" not in session:
-            return jsonify({"error": "Not authenticated"}), 401
-
-        user_id = session["user_id"]
-        db_service = current_app.config["DB_SERVICE"]
-
-        # Find pairing
-        pairing_collection = db_service.db["device_pairing_collection"]
-        pairing = pairing_collection.find_one(
-            {
-                "data.device_serial": device_serial,
-                "data.user_id": user_id,
-                "data.pairing_status": "active",
-            }
-        )
-
-        if not pairing:
-            return jsonify({"error": "Device not found or not authorized"}), 404
-
-        # Update pairing status to unpaired
-        pairing_collection.update_one(
-            {"_id": pairing["_id"]},
-            {
-                "$set": {
-                    "data.pairing_status": "unpaired",
-                    "data.unpaired_at": datetime.utcnow(),
-                    "metadata.updated_at": datetime.utcnow(),
-                }
-            },
-        )
-
-        return jsonify({"message": "Device unregistered successfully"}), 200
-
-    except Exception as e:
-        current_app.logger.error(f"Error unregistering device: {str(e)}")
         return jsonify({"error": str(e)}), 500

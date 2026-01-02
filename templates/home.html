@@ -98,6 +98,13 @@
                                 
                                 <p style="color: #999; font-size: 12px; margin-top: 10px;">Registered: {{ device.paired_at.strftime('%Y-%m-%d') if device.paired_at else 'N/A' }}</p>
                             </div>
+                            <form method="POST" action="/unregister-device/{{ device.serial_number }}" style="margin-left: 10px;">
+                                <button type="submit" 
+                                        onclick="return confirm('Are you sure you want to unregister this device?');"
+                                        style="background-color: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                    Unregister
+                                </button>
+                            </form>
                         </div>
                     </div>
                     {% endfor %}

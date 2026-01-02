@@ -251,6 +251,52 @@ def register_device():
     )
 
 
+@auth_bp.route("/unregister-device/<device_serial>", methods=["POST"])
+def unregister_device(device_serial):
+    # Check if user is logged in
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    try:
+        user_id = session["user_id"]
+        db_service = current_app.config["DB_SERVICE"]
+
+        # Find pairing
+        pairing_collection = db_service.db["device_pairing_collection"]
+        pairing = pairing_collection.find_one(
+            {
+                "data.device_serial": device_serial,
+                "data.user_id": user_id,
+                "data.pairing_status": "active",
+            }
+        )
+
+        if not pairing:
+            return redirect(
+                url_for("auth.home", error="Device not found or not authorized")
+            )
+
+        # Update pairing status to unpaired
+        pairing_collection.update_one(
+            {"_id": pairing["_id"]},
+            {
+                "$set": {
+                    "data.pairing_status": "unpaired",
+                    "data.unpaired_at": datetime.utcnow(),
+                    "metadata.updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+        return redirect(
+            url_for("auth.home", success="Device unregistered successfully!")
+        )
+    except Exception as e:
+        return redirect(
+            url_for("auth.home", error=f"Failed to unregister device: {str(e)}")
+        )
+
+
 @auth_bp.route("/add-emergency-contact", methods=["POST"])
 def add_emergency_contact():
     # Check if user is logged in
