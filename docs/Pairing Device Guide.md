@@ -49,7 +49,6 @@
    - **Payload**:
      ```json
      {
-       "serial_number": "[Your input serial number]",
        "status": "active"
      }
      ```

@@ -130,17 +130,17 @@ class MQTTService(BaseService):
             # Extract serial number from topic
             # Topic format: climbing/{serial_number}/status or climbing/{serial_number}
             topic_parts = topic.split("/")
-            if len(topic_parts) >= 2:
-                serial_number = topic_parts[1]
-                message_type = topic_parts[2] if len(topic_parts) >= 3 else "telemetry"
 
-                if message_type == "status":
+            serial_number = topic_parts[1]
+            message_type = topic_parts[2]
+
+            match message_type:
+                case "status":
                     self.handle_status(serial_number, payload)
-                elif message_type == "telegram":
-                    self.handle_telegram_response(serial_number, payload)
-                else:
-                    # Handle telemetry (session data)
+                case "telemetry":
                     self.handle_telemetry(serial_number, payload)
+                case "telegram":
+                    self.handle_telegram_response(serial_number, payload)
 
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON payload: {str(e)}")

@@ -1,6 +1,6 @@
 database:
   # Option 1: Use direct connection string (recommended for cloud databases)
-  connection_string: "mongodb+srv://doadmin:G8F70gJ2P4r165Sz@db-mongodb-fra1-59036-fe60198c.mongo.ondigitalocean.com/admin?tls=true&authSource=admin&replicaSet=db-mongodb-fra1-59036"
+  connection_string: "mongodb+srv://doadmin:Bp3MK6e01F92ga54@db-mongodb-fra1-59036-fe60198c.mongo.ondigitalocean.com/admin?tls=true&authSource=admin&replicaSet=db-mongodb-fra1-59036"
   
   # Option 2: Use individual connection parameters (for localhost)
   connection:
