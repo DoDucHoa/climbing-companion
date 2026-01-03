@@ -2,35 +2,6 @@
 
 A comprehensive Digital Twin framework for IoT-enabled climbing safety monitoring, built with Flask, MongoDB, and MQTT. This system manages device data, emergency alerting via Telegram, and climbing session tracking.
 
-## 🔑 Key Components
-
-### Digital Twin vs Digital Replica
-
-- **Digital Replica (DR)**: Schema-validated representation of a physical/logical entity stored in MongoDB. Created via `DRFactory` with Pydantic validation.
-
-- **Digital Twin (DT)**: Orchestrator that aggregates multiple DRs and manages attached services. Lives in `digital_twins` collection.
-
-### Two-Stage Validation System
-
-1. **Pydantic validation** (DRFactory): Dynamic model creation from YAML schemas. Validates on DR creation.
-2. **MongoDB schema validation** (SchemaRegistry): Converts YAML to `$jsonSchema` for database-level enforcement.
-
-### Services Architecture
-
-All services extend `BaseService` and implement:
-
-```python
-def execute(self, data: Dict, dr_type: str = None, attribute: str = None) -> Any:
-    # Process data and return results
-    pass
-```
-
-**Available Services:**
-- **DatabaseService**: MongoDB CRUD operations with schema validation
-- **MQTTService**: Device communication (HiveMQ broker)
-- **TelegramService**: Emergency notifications and bot interactions
-- **AggregationService**: Analytics on climbing data
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -53,28 +24,6 @@ def execute(self, data: Dict, dr_type: str = None, attribute: str = None) -> Any
    pip install -r requirements.txt
    ```
 
-3. **Configure database** (`config/database.yaml`):
-   ```yaml
-   database:
-     connection_string: "mongodb+srv://..."  # Your MongoDB URI
-     settings:
-       name: "climbing-companion"
-   ```
-
-4. **Configure Telegram** (`config/telegram_config.yaml`):
-   ```yaml
-   telegram:
-     bot_token: "YOUR_BOT_TOKEN"
-   ```
-
-5. **Configure MQTT** (`config/mqtt_config.yaml`):
-   ```yaml
-   mqtt:
-     broker:
-       host: "broker.hivemq.com"
-       port: 1883
-   ```
-
 ### Running the Application
 
 ```bash
@@ -92,19 +41,18 @@ Server starts on `http://0.0.0.0:5000` with debug mode enabled.
 
 ## 📡 MQTT Device Integration
 
-### Topics Structure
+The system uses **HiveMQ public broker** (`broker.hivemq.com:1883`) for real-time device communication. All messages use **QoS 1** for reliable delivery.
 
-```
-climbing/{device_serial}/status     # Device status updates
-device/data/{device_id}            # Real-time sensor data
-device/alerts/{device_id}          # Emergency alerts
-```
-### Session States
+### Topic Structure
 
-- **START**: Session begins, creates climbing_session DR
-- **ACTIVE**: Ongoing session, records session_events
-- **INCIDENT**: Emergency detected, triggers Telegram alerts
-- **END**: Session completes, updates final statistics
+| Topic Pattern                        | Direction       | Purpose                                                |
+| ------------------------------------ | --------------- | ------------------------------------------------------ |
+| `climbing/{device_serial}/status`    | Device → Server | Update device pairing status                           |
+| `climbing/{device_serial}/telemetry` | Device → Server | Send session data and sensor readings                  |
+| `climbing/{device_serial}/telegram`  | Device → Server | Send data to emergency contact                         |
+| `climbing/{device_serial}/request`   | Server → Device | Notify device that emergency contact requests for data |
+
+**Note**: `{device_serial}` is the unique hardware identifier registered in the system.
 
 ## 📂 Project Structure
 
@@ -164,30 +112,7 @@ device/alerts/{device_id}          # Emergency alerts
 
 ## 📚 Additional Resources
 
-- [Pairing Device Guide](docs/Pairing%20Device%20Guide.md) - Detailed device setup
+- [Testing Guide](docs/Testing%20Guide.md) - Detailed testing guide
 
-## 🐛 Troubleshooting
-
-### MQTT Connection Issues
-- Verify broker configuration in `config/mqtt_config.yaml`
-- Check if port 1883 is open
-- Review logs for connection errors
-
-### Database Connection Errors
-- Confirm MongoDB URI in `config/database.yaml`
-- Test connection string with MongoDB Compass
-- Check network/firewall settings
-
-### Telegram Not Working
-- Verify bot token in `config/telegram_config.yaml`
-- Ensure bot is started (send `/start` command)
-- Check emergency contacts have `telegram_chat_id`
-
-### Schema Validation Failures
-- Check YAML syntax in schema files
-- Verify mandatory fields are provided
-- Review Pydantic validation errors in logs
-
----
 
 **Built with:** Flask 3.1.0 | MongoDB | Pydantic | MQTT | Telegram Bot API
