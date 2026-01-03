@@ -1,7 +1,7 @@
 schemas:
   common_fields:
     profile:
-      create_at: datetime
+      created_at: datetime
       
     metadata:
       created_at: datetime
@@ -10,13 +10,23 @@ schemas:
     data:
       session_id: str
       device_serial: str
-      alt: float
+      trace: List[Dict]
 
   validations:
     mandatory_fields:
       profile:
-        - create_at
+        - created_at
       data:
         - session_id
         - device_serial
-        - alt
+        - trace
+
+    type_constraints:
+      trace:
+        item_constraints:
+          required_fields:
+            - height
+            - time
+          type_mappings:
+            height: float
+            time: int

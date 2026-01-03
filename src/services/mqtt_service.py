@@ -262,13 +262,13 @@ class MQTTService(BaseService):
             self.db_service.save_dr("climbing_session", climbing_session_dr)
             self.logger.info(f"Created climbing_session: {session_id}")
 
-            # Create session_event for START
+            # Create session_event for START with height=0 as baseline, time=0
             event_data = {
-                "profile": {"create_at": datetime.utcnow()},
+                "profile": {"created_at": datetime.utcnow()},
                 "data": {
                     "session_id": session_id,
                     "device_serial": device_serial,
-                    "alt": data.get("alt"),
+                    "trace": [{"height": 0.0, "time": 0}],
                 },
             }
 
@@ -284,7 +284,7 @@ class MQTTService(BaseService):
     def _handle_session_active(
         self, device_serial: str, session_id: str, data: Dict[str, Any]
     ):
-        """Handle ACTIVE session state - update climbing_session and create session_event"""
+        """Handle ACTIVE session state - update climbing_session and create session_event with trace array"""
         try:
             # Import DRFactory here to avoid circular imports
             from src.virtualization.digital_replica.dr_factory import DRFactory
@@ -313,13 +313,21 @@ class MQTTService(BaseService):
             else:
                 self.logger.debug(f"Session {session_id} already in ACTIVE state")
 
-            # Create session_event for ACTIVE
+            # Get trace array from payload (buffered height data from device)
+            trace = data.get("trace", [])
+            if not trace:
+                self.logger.warning(
+                    f"No trace data in ACTIVE payload for session: {session_id}"
+                )
+                return
+
+            # Create session_event with trace array
             event_data = {
-                "profile": {"create_at": datetime.utcnow()},
+                "profile": {"created_at": datetime.utcnow()},
                 "data": {
                     "session_id": session_id,
                     "device_serial": device_serial,
-                    "alt": data.get("alt"),
+                    "trace": trace,
                 },
             }
 
@@ -328,7 +336,7 @@ class MQTTService(BaseService):
             )
             self.db_service.save_dr("session_event", session_event_dr)
             self.logger.info(
-                f"Created session_event for ACTIVE: {session_id}, alt: {data.get('alt')}"
+                f"Created session_event for ACTIVE: {session_id}, trace points: {len(trace)}"
             )
 
         except Exception as e:
@@ -352,10 +360,18 @@ class MQTTService(BaseService):
                 )
                 return
 
+            # Get start_alt for height calculation
+            start_alt = existing_session.get("data", {}).get("start_alt", 0)
+            end_alt = data.get("alt", start_alt)
+            end_time = data.get("time", 0)  # Time in seconds from session start
+
+            # Calculate height relative to start position
+            height = end_alt - start_alt
+
             # Update climbing_session with end data
             session_updates = {
                 "profile": {"session_state": "END"},
-                "data": {"end_alt": data.get("alt"), "end_at": datetime.utcnow()},
+                "data": {"end_alt": end_alt, "end_at": datetime.utcnow()},
             }
 
             self.db_service.update_dr(
@@ -363,13 +379,13 @@ class MQTTService(BaseService):
             )
             self.logger.info(f"Updated climbing_session with END data: {session_id}")
 
-            # Create session_event for END
+            # Create session_event for END with trace format
             event_data = {
-                "profile": {"create_at": datetime.utcnow()},
+                "profile": {"created_at": datetime.utcnow()},
                 "data": {
                     "session_id": session_id,
                     "device_serial": device_serial,
-                    "alt": data.get("alt"),
+                    "trace": [{"height": float(height), "time": int(end_time)}],
                 },
             }
 
@@ -377,7 +393,9 @@ class MQTTService(BaseService):
                 "session_event", event_data
             )
             self.db_service.save_dr("session_event", session_event_dr)
-            self.logger.info(f"Created session_event for END: {session_id}")
+            self.logger.info(
+                f"Created session_event for END: {session_id}, height: {height}"
+            )
 
         except Exception as e:
             self.logger.error(f"Error handling session END: {str(e)}")
@@ -400,6 +418,14 @@ class MQTTService(BaseService):
                 )
                 return
 
+            # Get start_alt for height calculation
+            start_alt = existing_session.get("data", {}).get("start_alt", 0)
+            incident_alt = data.get("alt", start_alt)
+            incident_time = data.get("time", 0)  # Time in seconds from session start
+
+            # Calculate height relative to start position
+            height = incident_alt - start_alt
+
             # Update climbing_session state to INCIDENT
             session_updates = {"profile": {"session_state": "INCIDENT"}}
 
@@ -410,13 +436,13 @@ class MQTTService(BaseService):
                 f"Updated climbing_session state to INCIDENT: {session_id}"
             )
 
-            # Create session_event for INCIDENT
+            # Create session_event for INCIDENT with trace format
             event_data = {
-                "profile": {"create_at": datetime.utcnow()},
+                "profile": {"created_at": datetime.utcnow()},
                 "data": {
                     "session_id": session_id,
                     "device_serial": device_serial,
-                    "alt": data.get("alt"),
+                    "trace": [{"height": float(height), "time": int(incident_time)}],
                 },
             }
 
@@ -424,7 +450,9 @@ class MQTTService(BaseService):
                 "session_event", event_data
             )
             self.db_service.save_dr("session_event", session_event_dr)
-            self.logger.info(f"Created session_event for INCIDENT: {session_id}")
+            self.logger.info(
+                f"Created session_event for INCIDENT: {session_id}, height: {height}"
+            )
 
             # Send emergency alert via Telegram
             if self.telegram_service:
@@ -567,6 +595,7 @@ class MQTTService(BaseService):
             # Extract data from response
             chat_id = data.get("chat_id")
             user_name = data.get("user_name")
+            user_id = data.get("user_id")
             session_state = data.get("session_state", "UNKNOWN")
             latitude = data.get("latitude")
             longitude = data.get("longitude")
@@ -592,6 +621,7 @@ class MQTTService(BaseService):
                     humidity=humidity,
                     device_serial=serial_number,
                     session_id=session_id,
+                    user_id=user_id,
                 )
                 self.logger.info(f"Status response sent to chat_id: {chat_id}")
             else:

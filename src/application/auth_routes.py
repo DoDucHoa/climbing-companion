@@ -435,7 +435,7 @@ def delete_emergency_contact(contact_id):
 
 @auth_bp.route("/api/session-events/<session_id>")
 def get_session_events(session_id):
-    """API endpoint to get session events for visualization"""
+    """API endpoint to get session events for visualization (height over time)"""
     # Check if user is logged in
     if "user_id" not in session:
         return jsonify({"error": "Unauthorized"}), 401
@@ -456,14 +456,34 @@ def get_session_events(session_id):
         event_collection = db_service.db["session_event_collection"]
         events = list(
             event_collection.find({"data.session_id": session_id}).sort(
-                "profile.create_at", 1
+                "profile.created_at", 1
             )  # Sort by time ascending
         )
 
-        # Format data for chart
+        # Format data for chart - extract all trace points from all events
+        all_trace_points = []
+        for event in events:
+            trace = event.get("data", {}).get("trace", [])
+            created_at = event.get("profile", {}).get("created_at")
+            for point in trace:
+                all_trace_points.append(
+                    {
+                        "time": point.get("time", 0),
+                        "height": point.get("height", 0),
+                        "created_at": created_at,
+                    }
+                )
+
+        # Sort all trace points by time
+        all_trace_points.sort(key=lambda x: x["time"])
+
+        # Calculate max height for summary
+        max_height = max([p["height"] for p in all_trace_points], default=0)
+        end_height = all_trace_points[-1]["height"] if all_trace_points else 0
+
         chart_data = {
-            "labels": [],
-            "altitudes": [],
+            "times": [p["time"] for p in all_trace_points],
+            "heights": [p["height"] for p in all_trace_points],
             "session_info": {
                 "session_id": session_id,
                 "start_at": climbing_session["profile"]["start_at"].isoformat()
@@ -472,23 +492,12 @@ def get_session_events(session_id):
                 "session_state": climbing_session["profile"]["session_state"],
                 "start_alt": climbing_session["data"].get("start_alt"),
                 "end_alt": climbing_session["data"].get("end_alt"),
+                "max_height": max_height,
+                "end_height": end_height,
                 "temp": climbing_session["data"].get("temp"),
                 "humidity": climbing_session["data"].get("humidity"),
             },
         }
-
-        for event in events:
-            create_at = event["profile"]["create_at"]
-            alt = event["data"]["alt"]
-
-            # Format time label
-            if isinstance(create_at, datetime):
-                time_label = create_at.strftime("%H:%M:%S")
-            else:
-                time_label = str(create_at)
-
-            chart_data["labels"].append(time_label)
-            chart_data["altitudes"].append(alt)
 
         return jsonify(chart_data)
 

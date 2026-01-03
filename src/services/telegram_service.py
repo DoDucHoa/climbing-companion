@@ -17,6 +17,7 @@ class TelegramService:
         self.polling_thread = None
         self.polling_active = False
         self.last_update_id = 0
+        self.pending_status_checks = {}  # Track pending status check requests
         self._init_bot()
 
     def _load_config(self, path: str) -> Dict:
@@ -75,9 +76,6 @@ class TelegramService:
             message += f"• [View on Google Maps]({maps_url})\n"
         else:
             message += f"• Location: _Not available_\n"
-
-        if altitude is not None:
-            message += f"• Altitude: `{altitude}` meters\n"
 
         message += f"\n*Device:* `{device_serial or 'Unknown'}`\n"
         message += f"*Session ID:* `{session_id}`\n\n"
@@ -406,6 +404,23 @@ class TelegramService:
                         "❌ Failed to send request to device.\n\n"
                         "The device may be offline or unreachable.",
                     )
+                else:
+                    # Add to pending requests
+                    request_key = f"{chat_id}_{user_id}"
+                    self.pending_status_checks[request_key] = {
+                        "chat_id": str(chat_id),
+                        "user_id": user_id,
+                        "user_name": user_name,
+                        "timestamp": time.time(),
+                    }
+
+                    # Start timeout handler in background thread
+                    timeout_thread = threading.Thread(
+                        target=self._handle_status_check_timeout,
+                        args=(str(chat_id), user_id, user_name),
+                        daemon=True,
+                    )
+                    timeout_thread.start()
             else:
                 self._send_telegram_message(
                     str(chat_id), "❌ Error: MQTT service not available."
@@ -453,6 +468,55 @@ class TelegramService:
             self.logger.error(f"Error finding active device: {str(e)}")
             return None
 
+    def _has_active_session(self, user_id: str) -> bool:
+        """Check if user has any active or started climbing sessions"""
+        try:
+            session_collection = self.db_service.db["climbing_session_collection"]
+            active_session = session_collection.find_one(
+                {
+                    "data.user_id": user_id,
+                    "data.session_state": {"$in": ["ACTIVE", "START"]},
+                }
+            )
+            return active_session is not None
+        except Exception as e:
+            self.logger.error(f"Error checking active sessions: {str(e)}")
+            return False
+
+    def _handle_status_check_timeout(self, chat_id: str, user_id: str, user_name: str):
+        """Handle timeout for status check - send notification if no active session"""
+        try:
+            # Wait 10 seconds
+            time.sleep(10)
+
+            # Check if request still pending (not responded)
+            request_key = f"{chat_id}_{user_id}"
+            if request_key not in self.pending_status_checks:
+                # Already responded, do nothing
+                return
+
+            # Remove from pending
+            del self.pending_status_checks[request_key]
+
+            # Check if user has active session
+            has_active = self._has_active_session(user_id)
+
+            if not has_active:
+                # No active session - send notification
+                message = (
+                    f"*Status Update for {user_name}*\n\n"
+                    f"The climber is currently not in an active climbing session, or:\n"
+                    f"• The device is not in an area with internet connectivity\n"
+                    f"• The climber has not started their activity yet"
+                )
+                self._send_telegram_message(chat_id, message)
+                self.logger.info(
+                    f"Sent no-active-session notification to chat_id: {chat_id}"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error handling status check timeout: {str(e)}")
+
     def send_status_response(
         self,
         chat_id: str,
@@ -465,9 +529,17 @@ class TelegramService:
         humidity: Optional[float] = None,
         device_serial: Optional[str] = None,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ):
         """Send status response back to emergency contact"""
         try:
+            # Remove from pending requests if exists
+            if user_id:
+                request_key = f"{chat_id}_{user_id}"
+                if request_key in self.pending_status_checks:
+                    del self.pending_status_checks[request_key]
+                    self.logger.info(f"Removed pending status check: {request_key}")
+
             message = f"*Status Update for {user_name}*\n\n"
 
             # Session state
@@ -484,9 +556,6 @@ class TelegramService:
                 message += f"• [View on Google Maps]({maps_url})\n"
             else:
                 message += f"• Location: _Not available_\n"
-
-            if altitude is not None:
-                message += f"• Altitude: `{altitude:.1f}` meters\n"
 
             # Environmental data
             if temperature is not None or humidity is not None:
