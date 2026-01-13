@@ -493,10 +493,12 @@ class TelegramService:
             request_key = f"{chat_id}_{user_id}"
             if request_key not in self.pending_status_checks:
                 # Already responded, do nothing
+                self.logger.info(f"Status check already responded for: {request_key}")
                 return
 
             # Remove from pending
             del self.pending_status_checks[request_key]
+            self.logger.info(f"Status check timed out for: {request_key}")
 
             # Check if user has active session
             has_active = self._has_active_session(user_id)
@@ -512,6 +514,19 @@ class TelegramService:
                 self._send_telegram_message(chat_id, message)
                 self.logger.info(
                     f"Sent no-active-session notification to chat_id: {chat_id}"
+                )
+            else:
+                # Has active session but device didn't respond - likely connectivity issue
+                message = (
+                    f"*Status Update for {user_name}*\n\n"
+                    f"Unable to get current status from device.\n\n"
+                    f"The climber has an active session, but:\n"
+                    f"• The device may not be in an area with internet connectivity\n"
+                    f"• There may be a temporary connection issue"
+                )
+                self._send_telegram_message(chat_id, message)
+                self.logger.info(
+                    f"Sent device-unreachable notification to chat_id: {chat_id}"
                 )
 
         except Exception as e:
@@ -533,12 +548,21 @@ class TelegramService:
     ):
         """Send status response back to emergency contact"""
         try:
-            # Remove from pending requests if exists
+            # Remove from pending requests - critical to prevent timeout firing
             if user_id:
                 request_key = f"{chat_id}_{user_id}"
                 if request_key in self.pending_status_checks:
                     del self.pending_status_checks[request_key]
                     self.logger.info(f"Removed pending status check: {request_key}")
+                else:
+                    self.logger.warning(f"Pending status check not found: {request_key}")
+            else:
+                # Fallback: if user_id not provided, try to find and remove by chat_id
+                self.logger.warning(f"user_id not provided in status response for chat_id: {chat_id}")
+                keys_to_remove = [key for key in self.pending_status_checks.keys() if key.startswith(f"{chat_id}_")]
+                for key in keys_to_remove:
+                    del self.pending_status_checks[key]
+                    self.logger.info(f"Removed pending status check by chat_id match: {key}")
 
             message = f"*Status Update for {user_name}*\n\n"
 
