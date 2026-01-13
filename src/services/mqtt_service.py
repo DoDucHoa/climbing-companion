@@ -383,13 +383,8 @@ class MQTTService(BaseService):
     def _handle_session_end(
         self, device_serial: str, session_id: str, data: Dict[str, Any]
     ):
-        """Handle END session state - update climbing_session and create final session_event"""
+        """Handle END session state - update climbing_session only"""
         try:
-            # Import DRFactory here to avoid circular imports
-            from src.virtualization.digital_replica.dr_factory import DRFactory
-
-            session_event_factory = DRFactory("config/session_event_schema.yaml")
-
             # Find climbing_session
             existing_session = self._find_session_by_id(session_id)
             if not existing_session:
@@ -398,13 +393,9 @@ class MQTTService(BaseService):
                 )
                 return
 
-            # Get start_alt for height calculation
+            # Get end altitude
             start_alt = existing_session.get("data", {}).get("start_alt", 0)
             end_alt = data.get("alt", start_alt)
-            end_time = data.get("time", 0)  # Time in seconds from session start
-
-            # Calculate height relative to start position
-            height = end_alt - start_alt
 
             # Update climbing_session with end data
             session_updates = {
@@ -415,25 +406,7 @@ class MQTTService(BaseService):
             self.db_service.update_dr(
                 "climbing_session", existing_session["_id"], session_updates
             )
-            self.logger.info(f"Updated climbing_session with END data: {session_id}")
-
-            # Create session_event for END with trace format
-            event_data = {
-                "profile": {"created_at": datetime.utcnow()},
-                "data": {
-                    "session_id": session_id,
-                    "device_serial": device_serial,
-                    "trace": [{"height": float(height), "time": int(end_time)}],
-                },
-            }
-
-            session_event_dr = session_event_factory.create_dr(
-                "session_event", event_data
-            )
-            self.db_service.save_dr("session_event", session_event_dr)
-            self.logger.info(
-                f"Created session_event for END: {session_id}, height: {height}"
-            )
+            self.logger.info(f"Session ended: {session_id}, end_alt: {end_alt}m")
 
         except Exception as e:
             self.logger.error(f"Error handling session END: {str(e)}")
