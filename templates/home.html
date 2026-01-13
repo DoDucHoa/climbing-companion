@@ -126,76 +126,73 @@
                     <h3 style="color: #424242; font-size: 16px; margin-bottom: 15px;">Your Sessions</h3>
                     
                     {% for ses in sessions %}
-                    <div class="info-card session-card" data-session-id="{{ ses.data.session_id }}" 
-                         style="margin-bottom: 15px; cursor: pointer; transition: box-shadow 0.3s;"
-                         onclick="loadSessionData('{{ ses.data.session_id }}')">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                    {% if ses.profile.session_state == 'END' %}
-                                    <span style="background-color: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Completed</span>
-                                    {% elif ses.profile.session_state == 'ACTIVE' %}
-                                    <span style="background-color: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Active</span>
-                                    {% elif ses.profile.session_state == 'START' %}
-                                    <span style="background-color: #FF9800; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Started</span>
-                                    {% elif ses.profile.session_state == 'INCIDENT' %}
-                                    <span style="background-color: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Incident</span>
+                    <div class="session-container" style="margin-bottom: 15px;">
+                        <div class="info-card session-card" data-session-id="{{ ses.data.session_id }}" 
+                             style="margin-bottom: 0; cursor: pointer; transition: all 0.3s; position: relative;"
+                             onclick="toggleSessionData('{{ ses.data.session_id }}')">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                        {% if ses.profile.session_state == 'END' %}
+                                        <span style="background-color: #4CAF50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Completed</span>
+                                        {% elif ses.profile.session_state == 'ACTIVE' %}
+                                        <span style="background-color: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Active</span>
+                                        {% elif ses.profile.session_state == 'START' %}
+                                        <span style="background-color: #FF9800; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Started</span>
+                                        {% elif ses.profile.session_state == 'INCIDENT' %}
+                                        <span style="background-color: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Incident</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <p><strong>Start:</strong> {{ ses.profile.start_at.strftime('%Y-%m-%d %H:%M:%S') if ses.profile.start_at else 'N/A' }}</p>
+                                    
+                                    {% if ses.data.end_at %}
+                                    <p><strong>End:</strong> {{ ses.data.end_at.strftime('%Y-%m-%d %H:%M:%S') if ses.data.end_at is not string else ses.data.end_at }}</p>
                                     {% endif %}
+                                    
+                                    {% if ses.data.start_alt %}
+                                    <p><strong>Start Altitude:</strong> {{ "%.1f"|format(ses.data.start_alt) }}m</p>
+                                    {% endif %}
+                                    
+                                    {% if ses.data.end_alt %}
+                                    <p><strong>End Altitude:</strong> {{ "%.1f"|format(ses.data.end_alt) }}m</p>
+                                    {% endif %}
+                                    
+                                    <p style="color: #999; font-size: 12px; margin-top: 5px;">Click to view details</p>
+                                </div>
+                                <div class="expand-arrow" style="font-size: 20px; color: #757575; transition: transform 0.3s;">▼</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Session Detail View - Accordion Style -->
+                        <div class="session-detail" id="sessionDetail-{{ ses.data.session_id }}" style="display: none; overflow: hidden; transition: max-height 0.3s ease-out;">
+                            <div style="background: #f9f9f9; padding: 20px; border-left: 3px solid #1976d2; margin-top: 0;">
+                                <!-- Session Summary -->
+                                <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                                    <h4 style="margin-top: 0; color: #424242; margin-bottom: 15px;">Session Summary</h4>
+                                    <div class="session-summary-content">
+                                        <p><strong>Start Time:</strong> <span class="summary-start-at">-</span></p>
+                                        <p><strong>Location(Lat, Lon):</strong> <span class="summary-latitude">-</span>, <span class="summary-longitude">-</span></p>
+                                        <p><strong>Start Altitude (Sea Level):</strong> <span class="summary-start-alt">-</span> m</p>
+                                        <p><strong>End Altitude (Sea Level):</strong> <span class="summary-end-alt">-</span> m</p>
+                                        <p><strong>Max Height Climbed:</strong> <span class="summary-max-height">-</span> m</p>
+                                        <p><strong>Final Height:</strong> <span class="summary-end-height">-</span> m</p>
+                                        <p><strong>Temperature:</strong> <span class="summary-temp">-</span> °C</p>
+                                        <p><strong>Humidity:</strong> <span class="summary-humidity">-</span> %</p>
+                                    </div>
                                 </div>
                                 
-                                <p><strong>Start:</strong> {{ ses.profile.start_at.strftime('%Y-%m-%d %H:%M:%S') if ses.profile.start_at else 'N/A' }}</p>
-                                
-                                {% if ses.data.end_at %}
-                                <p><strong>End:</strong> {{ ses.data.end_at.strftime('%Y-%m-%d %H:%M:%S') if ses.data.end_at is not string else ses.data.end_at }}</p>
-                                {% endif %}
-                                
-                                {% if ses.data.start_alt %}
-                                <p><strong>Start Altitude:</strong> {{ "%.1f"|format(ses.data.start_alt) }}m</p>
-                                {% endif %}
-                                
-                                {% if ses.data.end_alt %}
-                                <p><strong>End Altitude:</strong> {{ "%.1f"|format(ses.data.end_alt) }}m</p>
-                                {% endif %}
-                                
-                                <p style="color: #999; font-size: 12px; margin-top: 5px;">Click to view details</p>
+                                <!-- Height Chart -->
+                                <div style="background: white; padding: 15px; border-radius: 4px;">
+                                    <h4 style="margin-top: 0; color: #424242; margin-bottom: 15px;">Height Over Time (from Start Position)</h4>
+                                    <div style="position: relative; height: 400px;">
+                                        <canvas class="height-chart"></canvas>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     {% endfor %}
-                </div>
-                
-                <!-- Session Detail View -->
-                <div id="sessionDetail" style="display: none; margin-top: 30px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="color: #424242; font-size: 16px; margin: 0;">Session Details</h3>
-                        <button onclick="closeSessionDetail()" 
-                                style="padding: 5px 15px; background-color: #757575; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            Close
-                        </button>
-                    </div>
-                    
-                    <!-- Session Summary -->
-                    <div class="info-card" style="margin-bottom: 20px;">
-                        <h4 style="margin-top: 0; color: #424242;">Session Summary</h4>
-                        <div id="sessionSummary">
-                            <p><strong>Start Time:</strong> <span id="summaryStartAt">-</span></p>
-                            <p><strong>Location(Lat, Lon):</strong> <span id="summaryLatitude">-</span>, <span id="summaryLongitude">-</span></p>
-                            <p><strong>Start Altitude (Sea Level):</strong> <span id="summaryStartAlt">-</span> m</p>
-                            <p><strong>End Altitude (Sea Level):</strong> <span id="summaryEndAlt">-</span> m</p>
-                            <p><strong>Max Height Climbed:</strong> <span id="summaryMaxHeight">-</span> m</p>
-                            <p><strong>Final Height:</strong> <span id="summaryEndHeight">-</span> m</p>
-                            <p><strong>Temperature:</strong> <span id="summaryTemp">-</span> °C</p>
-                            <p><strong>Humidity:</strong> <span id="summaryHumidity">-</span> %</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Height Chart -->
-                    <div class="info-card">
-                        <h4 style="margin-top: 0; color: #424242;">Height Over Time (from Start Position)</h4>
-                        <div style="position: relative; height: 400px;">
-                            <canvas id="heightChart"></canvas>
-                        </div>
-                    </div>
                 </div>
                 
             {% else %}
@@ -296,7 +293,8 @@
     </div>
 
     <script>
-        let altitudeChart = null;
+        let activeCharts = {};  // Store charts by session ID
+        let currentOpenSession = null;  // Track currently open session
         
         function showTab(tabName) {
             // Hide all tabs
@@ -317,12 +315,52 @@
             // TODO: Implement edit modal or inline form
         }
         
-        async function loadSessionData(sessionId) {
+        async function toggleSessionData(sessionId) {
+            const detailDiv = document.getElementById(`sessionDetail-${sessionId}`);
+            const sessionCard = document.querySelector(`[data-session-id="${sessionId}"]`);
+            const arrow = sessionCard.querySelector('.expand-arrow');
+            
+            // If clicking the same session that's already open, close it
+            if (currentOpenSession === sessionId) {
+                detailDiv.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+                sessionCard.classList.remove('selected');
+                currentOpenSession = null;
+                
+                // Destroy chart for this session
+                if (activeCharts[sessionId]) {
+                    activeCharts[sessionId].destroy();
+                    delete activeCharts[sessionId];
+                }
+                return;
+            }
+            
+            // Close previously open session
+            if (currentOpenSession) {
+                const prevDetailDiv = document.getElementById(`sessionDetail-${currentOpenSession}`);
+                const prevCard = document.querySelector(`[data-session-id="${currentOpenSession}"]`);
+                const prevArrow = prevCard.querySelector('.expand-arrow');
+                
+                prevDetailDiv.style.display = 'none';
+                prevArrow.style.transform = 'rotate(0deg)';
+                prevCard.classList.remove('selected');
+                
+                // Destroy previous chart
+                if (activeCharts[currentOpenSession]) {
+                    activeCharts[currentOpenSession].destroy();
+                    delete activeCharts[currentOpenSession];
+                }
+            }
+            
+            // Open current session
             try {
-                // Show loading state
-                const detailDiv = document.getElementById('sessionDetail');
                 detailDiv.style.display = 'block';
-                detailDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                arrow.style.transform = 'rotate(180deg)';
+                sessionCard.classList.add('selected');
+                currentOpenSession = sessionId;
+                
+                // Scroll to the session card
+                sessionCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 
                 // Fetch session data
                 const response = await fetch(`/api/session-events/${sessionId}`);
@@ -332,51 +370,60 @@
                 
                 const data = await response.json();
                 
-                // Update summary
-                updateSessionSummary(data.session_info);
+                // Update summary for this specific session
+                updateSessionSummary(sessionId, data.session_info);
                 
-                // Create or update chart with new format (times, heights)
-                renderHeightChart(data.times, data.heights);
+                // Create chart for this session
+                renderHeightChart(sessionId, data.times, data.heights);
                 
             } catch (error) {
                 console.error('Error loading session data:', error);
                 alert('Failed to load session data. Please try again.');
+                detailDiv.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+                sessionCard.classList.remove('selected');
+                currentOpenSession = null;
             }
         }
         
-        function updateSessionSummary(sessionInfo) {
+        function updateSessionSummary(sessionId, sessionInfo) {
+            const detailDiv = document.getElementById(`sessionDetail-${sessionId}`);
+            
             if (sessionInfo.start_at) {
                 const startDate = new Date(sessionInfo.start_at);
-                document.getElementById('summaryStartAt').textContent = startDate.toLocaleString();
+                detailDiv.querySelector('.summary-start-at').textContent = startDate.toLocaleString();
             }
             
             // Display location coordinates
-            document.getElementById('summaryLatitude').textContent = sessionInfo.start_lat ? sessionInfo.start_lat.toFixed(6) : '-';
-            document.getElementById('summaryLongitude').textContent = sessionInfo.start_lon ? sessionInfo.start_lon.toFixed(6) : '-';
+            detailDiv.querySelector('.summary-latitude').textContent = sessionInfo.start_lat ? sessionInfo.start_lat.toFixed(6) : '-';
+            detailDiv.querySelector('.summary-longitude').textContent = sessionInfo.start_lon ? sessionInfo.start_lon.toFixed(6) : '-';
             
-            document.getElementById('summaryStartAlt').textContent = sessionInfo.start_alt ? sessionInfo.start_alt.toFixed(1) : '-';
-            document.getElementById('summaryEndAlt').textContent = sessionInfo.end_alt ? sessionInfo.end_alt.toFixed(1) : '-';
+            detailDiv.querySelector('.summary-start-alt').textContent = sessionInfo.start_alt ? sessionInfo.start_alt.toFixed(1) : '-';
+            detailDiv.querySelector('.summary-end-alt').textContent = sessionInfo.end_alt ? sessionInfo.end_alt.toFixed(1) : '-';
             
             // Display max height and end height
             const maxHeight = sessionInfo.max_height || 0;
             const endHeight = sessionInfo.end_height || 0;
             
-            document.getElementById('summaryMaxHeight').textContent = maxHeight.toFixed(1);
-            document.getElementById('summaryMaxHeight').style.color = maxHeight > 0 ? '#4CAF50' : '#424242';
+            const maxHeightElem = detailDiv.querySelector('.summary-max-height');
+            maxHeightElem.textContent = maxHeight.toFixed(1);
+            maxHeightElem.style.color = maxHeight > 0 ? '#4CAF50' : '#424242';
             
-            document.getElementById('summaryEndHeight').textContent = endHeight.toFixed(1);
-            document.getElementById('summaryEndHeight').style.color = endHeight >= 0 ? '#4CAF50' : '#f44336';
+            const endHeightElem = detailDiv.querySelector('.summary-end-height');
+            endHeightElem.textContent = endHeight.toFixed(1);
+            endHeightElem.style.color = endHeight >= 0 ? '#4CAF50' : '#f44336';
             
-            document.getElementById('summaryTemp').textContent = sessionInfo.temp ? sessionInfo.temp.toFixed(1) : '-';
-            document.getElementById('summaryHumidity').textContent = sessionInfo.humidity ? sessionInfo.humidity.toFixed(1) : '-';
+            detailDiv.querySelector('.summary-temp').textContent = sessionInfo.temp ? sessionInfo.temp.toFixed(1) : '-';
+            detailDiv.querySelector('.summary-humidity').textContent = sessionInfo.humidity ? sessionInfo.humidity.toFixed(1) : '-';
         }
         
-        function renderHeightChart(times, heights) {
-            const ctx = document.getElementById('heightChart').getContext('2d');
+        function renderHeightChart(sessionId, times, heights) {
+            const detailDiv = document.getElementById(`sessionDetail-${sessionId}`);
+            const ctx = detailDiv.querySelector('.height-chart').getContext('2d');
             
             // Destroy existing chart if it exists
-            if (altitudeChart) {
-                altitudeChart.destroy();
+            if (activeCharts[sessionId]) {
+                activeCharts[sessionId].destroy();
             }
             
             // Prepare data as scatter points with x (time) and y (height)
@@ -390,7 +437,7 @@
             const pointHoverRadius = pointRadius + 2;
             
             // Create new scatter chart with connected points
-            altitudeChart = new Chart(ctx, {
+            activeCharts[sessionId] = new Chart(ctx, {
                 type: 'scatter',
                 data: {
                     datasets: [{
@@ -493,17 +540,6 @@
                     }
                 }
             });
-        }
-        
-        function closeSessionDetail() {
-            const detailDiv = document.getElementById('sessionDetail');
-            detailDiv.style.display = 'none';
-            
-            // Destroy chart to free memory
-            if (altitudeChart) {
-                altitudeChart.destroy();
-                altitudeChart = null;
-            }
         }
     </script>
 </body>
