@@ -8,6 +8,7 @@ mqtt:
   topics:
     status: "climbing/+/status"
     telemetry: "climbing/+/telemetry"
+    incident: "climbing/+/incident"
     telegram_response: "climbing/+/telegram"
     device_request: "climbing/{serial}/request"
     

@@ -100,10 +100,12 @@ class MQTTService(BaseService):
 
             self.client.subscribe(topics_config["status"], qos=qos)
             self.client.subscribe(topics_config["telemetry"], qos=qos)
+            self.client.subscribe(topics_config["incident"], qos=qos)
             self.client.subscribe(topics_config["telegram_response"], qos=qos)
 
             self.logger.info(f"Subscribed to topic: {topics_config['status']}")
             self.logger.info(f"Subscribed to topic: {topics_config['telemetry']}")
+            self.logger.info(f"Subscribed to topic: {topics_config['incident']}")
             self.logger.info(
                 f"Subscribed to topic: {topics_config['telegram_response']}"
             )
@@ -139,6 +141,8 @@ class MQTTService(BaseService):
                     self.handle_status(serial_number, payload)
                 case "telemetry":
                     self.handle_telemetry(serial_number, payload)
+                case "incident":
+                    self.handle_incident(serial_number, payload)
                 case "telegram":
                     self.handle_telegram_response(serial_number, payload)
 
@@ -222,13 +226,47 @@ class MQTTService(BaseService):
                 self._handle_session_active(serial_number, session_id, data)
             elif session_state == "END":
                 self._handle_session_end(serial_number, session_id, data)
-            elif session_state == "INCIDENT":
-                self._handle_session_incident(serial_number, user_id, session_id, data)
+
             else:
                 self.logger.warning(f"Unknown session_state: {session_state}")
 
         except Exception as e:
             self.logger.error(f"Error handling telemetry: {str(e)}")
+
+    def handle_incident(self, serial_number: str, data: Dict[str, Any]):
+        """Handle incident data from device"""
+        try:
+            session_id = data.get("session_id")
+
+            if not session_id:
+                self.logger.error(
+                    f"Missing session_id in incident data from device: {serial_number}"
+                )
+                return
+
+            self.logger.info(
+                f"Processing INCIDENT for device: {serial_number}, session: {session_id}"
+            )
+
+            # Find device by serial number
+            device = self._find_device_by_serial(serial_number)
+            if not device:
+                self.logger.error(f"Device not found: {serial_number}")
+                return
+
+            # Get user_id from device pairing
+            user_id = self._get_user_from_device(serial_number)
+            if not user_id:
+                self.logger.error(
+                    f"No active device pairing found for device: {serial_number}"
+                )
+                return
+
+            # Handle incident
+            self._handle_session_incident(serial_number, user_id, session_id, data)
+
+        except Exception as e:
+            self.logger.error(f"Error handling incident: {str(e)}")
 
     def _handle_session_start(
         self, device_serial: str, user_id: str, session_id: str, data: Dict[str, Any]
