@@ -490,6 +490,8 @@ def get_session_events(session_id):
                 if climbing_session["profile"]["start_at"]
                 else None,
                 "session_state": climbing_session["profile"]["session_state"],
+                "start_lat": climbing_session["data"].get("latitude"),
+                "start_lon": climbing_session["data"].get("longitude"),
                 "start_alt": climbing_session["data"].get("start_alt"),
                 "end_alt": climbing_session["data"].get("end_alt"),
                 "max_height": max_height,

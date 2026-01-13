@@ -179,7 +179,9 @@
                         <h4 style="margin-top: 0; color: #424242;">Session Summary</h4>
                         <div id="sessionSummary">
                             <p><strong>Start Time:</strong> <span id="summaryStartAt">-</span></p>
+                            <p><strong>Location(Lat, Lon):</strong> <span id="summaryLatitude">-</span>, <span id="summaryLongitude">-</span></p>
                             <p><strong>Start Altitude (Sea Level):</strong> <span id="summaryStartAlt">-</span> m</p>
+                            <p><strong>End Altitude (Sea Level):</strong> <span id="summaryEndAlt">-</span> m</p>
                             <p><strong>Max Height Climbed:</strong> <span id="summaryMaxHeight">-</span> m</p>
                             <p><strong>Final Height:</strong> <span id="summaryEndHeight">-</span> m</p>
                             <p><strong>Temperature:</strong> <span id="summaryTemp">-</span> °C</p>
@@ -348,7 +350,12 @@
                 document.getElementById('summaryStartAt').textContent = startDate.toLocaleString();
             }
             
+            // Display location coordinates
+            document.getElementById('summaryLatitude').textContent = sessionInfo.start_lat ? sessionInfo.start_lat.toFixed(6) : '-';
+            document.getElementById('summaryLongitude').textContent = sessionInfo.start_lon ? sessionInfo.start_lon.toFixed(6) : '-';
+            
             document.getElementById('summaryStartAlt').textContent = sessionInfo.start_alt ? sessionInfo.start_alt.toFixed(1) : '-';
+            document.getElementById('summaryEndAlt').textContent = sessionInfo.end_alt ? sessionInfo.end_alt.toFixed(1) : '-';
             
             // Display max height and end height
             const maxHeight = sessionInfo.max_height || 0;
