@@ -27,8 +27,6 @@ schemas:
         enum:
           - "active"
           - "inactive"
-          - "maintenance"
-          - "retired"
           
       battery_level:
         min: 0
