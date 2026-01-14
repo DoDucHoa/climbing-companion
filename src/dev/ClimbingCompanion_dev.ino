@@ -204,10 +204,18 @@ void stateMachine() {
     if (currentSession.state == "INACTIVE") {
         setLEDColor(0, 255, 0); // Steady Green
     } 
+
+    else if (currentSession.state == "START") {
+        startClimb();
+    } 
     
     else if (currentSession.state == "ACTIVE") {
         setLEDColor(255, 0, 0); // Solid Red
         runSessionLogic();      // Monitor altitude and motion data
+    } 
+
+    else if (currentSession.state == "END") {
+        stopClimb();
     } 
     
     else if (currentSession.state == "INCIDENT") {
@@ -223,10 +231,10 @@ void handleButton() {
     if (currentBtnState == LOW && lastBtnState == HIGH) {         
         // --- Transition Logic ---
         if (currentSession.state == "INACTIVE") {
-            startClimb(); 
+            currentSession.state = "START";
         } 
         else if (currentSession.state == "ACTIVE") {
-            stopClimb();
+            currentSession.state = "END";
         }
         else if (currentSession.state == "INCIDENT") {
             // Cancel Alarm: Reset back to ACTIVE
