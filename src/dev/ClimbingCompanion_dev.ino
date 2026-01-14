@@ -474,8 +474,7 @@ void sendActiveSession() {
 
     const size_t capacity = JSON_ARRAY_SIZE(currentLogIndex) + currentLogIndex * JSON_OBJECT_SIZE(2) + 200;
     DynamicJsonDocument doc(capacity);
-    // If we are in an incident currently, the session data state has to be active no not always trigger a emergency alert
-    // ToDo : Extra topic for emergency events with also another QoS and so on
+    // If we are in an incident currently, the session data state has to be active to be saved
     doc["session_state"] = currentSession.state=="INCIDENT"?"ACTIVE":currentSession.state; 
     doc["session_id"] = currentSession.id;
     
