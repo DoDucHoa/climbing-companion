@@ -218,6 +218,7 @@ SEA_LEVEL_PRESSURE_HPA = 1022.0   // Barometric calibration
 ## 📚 Additional Resources
 
 - [Testing Guide](docs/Testing%20Guide.md) - Detailed testing guide
+- [MQTT Message Exchange Formats](docs/MQTT%20Message%20Exchange%20Formats.md) - Complete MQTT message specifications and topic structure
 
 
 **Built with:** Flask 3.1.0 | MongoDB | Pydantic | MQTT | Telegram Bot API
