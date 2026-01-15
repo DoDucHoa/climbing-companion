@@ -235,22 +235,6 @@ def update_profile():
         )
 
 
-@auth_bp.route("/register-device", methods=["POST"])
-def register_device():
-    # Check if user is logged in
-    if "user_id" not in session:
-        return redirect(url_for("auth.login"))
-
-    # Placeholder - just redirect back for now
-    serial_number = request.form.get("serial_number")
-    return redirect(
-        url_for(
-            "auth.home",
-            success=f"Device registration feature coming soon! (Serial: {serial_number})",
-        )
-    )
-
-
 @auth_bp.route("/unregister-device/<device_serial>", methods=["POST"])
 def unregister_device(device_serial):
     # Check if user is logged in
