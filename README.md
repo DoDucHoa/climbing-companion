@@ -54,6 +54,109 @@ The system uses **HiveMQ public broker** (`broker.hivemq.com:1883`) for real-tim
 
 **Note**: `{device_serial}` is the unique hardware identifier registered in the system.
 
+## 🔧 IoT Device Implementation (NodeMCU ESP8266)
+
+The climbing companion device is built on **ESP8266 NodeMCU** with multiple sensors for comprehensive climbing safety monitoring.
+
+### Hardware Components
+
+| Component       | Model/Type      | Purpose                                        |
+| --------------- | --------------- | ---------------------------------------------- |
+| Microcontroller | ESP8266 NodeMCU | WiFi connectivity and main processing          |
+| Environmental   | BME280          | Temperature, humidity, and barometric altitude |
+| Motion Sensor   | MPU9250         | 9-axis IMU for fall detection (accelerometer)  |
+| GPS Module      | Generic GPS     | Location tracking (UART communication)         |
+| RGB LED         | Common Anode    | Visual status indication (3 pins: R, G, B)     |
+| Buzzer          | Active Buzzer   | Audio alerts for incidents                     |
+| Push Button     | Momentary       | Session start/stop and incident cancellation   |
+
+### Device State Machine
+
+The device operates through a finite state machine with the following states:
+
+#### 1. **INACTIVE** (Green LED)
+- Default state when powered on
+- Waiting for user to press button to start climbing session
+- Periodic sensor readings in standby mode
+
+#### 2. **START** (Transition State)
+- Triggered by button press from INACTIVE
+- Captures baseline environmental data:
+  - GPS coordinates (latitude, longitude)
+  - Initial barometric altitude
+  - Temperature and humidity
+  - Generates unique session ID
+- Publishes session start message to MQTT
+- Transitions to ACTIVE state
+
+#### 3. **ACTIVE** (Red LED)
+- Main climbing monitoring state
+- **Altitude tracking**: Logs barometric height delta every 500ms (2Hz frequency)
+- **Fall detection**: Continuously monitors accelerometer data
+  - Triggers on extreme G-force (<0.25g or >6.0g)
+  - Monitors for 10 seconds of stillness after trigger
+  - Movement within 5-10s window cancels alarm
+- Batches up to 40 altitude points before sending to server
+- Button press transitions to END state
+
+#### 4. **INCIDENT** (Blinking Yellow LED + Buzzer)
+- Activated when fall detected + 10s of no movement
+- **30-second local countdown**:
+  - Yellow LED blinks at 1Hz
+  - Buzzer beeps at 1kHz (alternating on/off)
+  - Button press cancels and returns to ACTIVE
+- **After 30 seconds**: Sends emergency MQTT message with:
+  - Current GPS coordinates
+  - Altitude at incident time
+  - Session ID for tracking
+- Continues altitude monitoring (fall detection disabled)
+
+#### 5. **END** (Transition State)
+- Triggered by button press from ACTIVE
+- Sends any pending altitude trace data
+- Captures final GPS altitude
+- Publishes session end message with total duration
+- Returns to INACTIVE state
+
+### Configuration Parameters
+
+```cpp
+MONITORING_INTERVALL = 500ms      // Altitude sampling rate (2Hz)
+MAX_BATCH_SIZE = 40               // Points per MQTT message (20 seconds)
+INCIDENT_WAIT_TIME = 30000ms      // Local alarm duration before emergency
+SEA_LEVEL_PRESSURE_HPA = 1022.0   // Barometric calibration
+```
+
+### LED Status Indicators
+
+| Color          | State           | Meaning                                            |
+| -------------- | --------------- | -------------------------------------------------- |
+| Green (solid)  | INACTIVE        | Ready for climbing session                         |
+| Red (solid)    | ACTIVE          | Session in progress, monitoring active             |
+| Yellow (blink) | INCIDENT (30s)  | Fall detected, local alarm, press button to cancel |
+| Yellow (solid) | INCIDENT (30s+) | Emergency sent, awaiting rescue                    |
+
+### Setup and Deployment
+
+1. **Configure WiFi credentials** in `ClimbingCompanion_dev.ino`:
+   ```cpp
+   static const char* ssid = "YOUR_WIFI_SSID";
+   static const char* password = "YOUR_WIFI_PASSWORD";
+   ```
+
+2. **Set unique device serial**:
+   ```cpp
+   static const char* DEVICE_SERIAL = "DEV_01";  // Change for each device
+   ```
+
+3. **Upload to NodeMCU** using Arduino IDE:
+   - Board: NodeMCU 1.0 (ESP-12E Module)
+   - Upload Speed: 115200
+
+4. **Register device** in web application using the `DEVICE_SERIAL` value
+
+5. **Pair device** to user account through the dashboard
+
 ## 📂 Project Structure
 
 ```
@@ -82,6 +185,8 @@ The system uses **HiveMQ public broker** (`broker.hivemq.com:1883`) for real-tim
 │   ├── digital_twin/
 │   │   ├── core.py                # DigitalTwin class
 │   │   └── dt_factory.py          # DT factory and management
+│   ├── dev/
+│   │   └── ClimbingCompanion_dev.ino # NodeMCU code
 │   ├── services/
 │   │   ├── base.py                # BaseService abstract class
 │   │   ├── database_service.py    # MongoDB operations
