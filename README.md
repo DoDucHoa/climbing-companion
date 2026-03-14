@@ -1,6 +1,6 @@
 # Climbing Companion - Digital Twin IoT Platform
 
-A comprehensive Digital Twin framework for IoT-enabled climbing safety monitoring, built with Flask, MongoDB, and MQTT. This system manages device data, emergency alerting via Telegram, and climbing session tracking.
+IoT-based climbing safety platform with real-time fall detection, Digital Twin architecture, and automated emergency Telegram alerts — powered by ESP8266, Flask, MongoDB, and MQTT.
 
 ## 🚀 Getting Started
 
