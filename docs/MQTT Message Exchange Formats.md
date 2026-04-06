@@ -1,10 +1,13 @@
 # MQTT Message Exchange Formats
 
 ## Topic Structure
+
 ### Topic Naming Convention
+
 All topics follow the pattern: `climbing/{device_serial}/{message_type}`
 
 ### Subscribed Topics (Server)
+
 | Topic Pattern          | Description            | Wildcard     |
 | ---------------------- | ---------------------- | ------------ |
 | `climbing/+/status`    | Device status updates  | Single-level |
@@ -13,6 +16,7 @@ All topics follow the pattern: `climbing/{device_serial}/{message_type}`
 | `climbing/+/telegram`  | Telegram bot responses | Single-level |
 
 ### Published Topics (Server → Device)
+
 | Topic Pattern               | Description              |
 | --------------------------- | ------------------------ |
 | `climbing/{serial}/request` | Status request to device |
